@@ -18,6 +18,7 @@ var locateControl = L.control.locate({
         outOfView: 'setView',
         inViewNotFollowing: 'inView'
     },
+    // Ensures no error message when user denies current location
     onLocationError(err, control) {
         void(0);
     }
