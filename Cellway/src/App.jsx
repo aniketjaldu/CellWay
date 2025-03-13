@@ -13,25 +13,19 @@ function App() {
   // Reference to the origin input element
   const originInputRef = useRef(null);
 
+  // Initialize map
   useEffect(() => {
-    // Make sure Leaflet is loaded
     if (!mapRef.current || !window.L) return;
     
     // Create map instance
     const mapInstance = L.map(mapRef.current).setView([51.505, -0.09], 13);
-    setMap(mapInstance);
     
-    // Force map to invalidate its size after mounting to ensure proper rendering
-    setTimeout(() => {
-      mapInstance.invalidateSize();
-    }, 100);
-
     // Add tile layer
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
     }).addTo(mapInstance);
 
-    // Create custom CSS for pulsing blue circle
+    // Add custom CSS for markers
     const style = document.createElement('style');
     style.innerHTML = `
       .origin-marker {
@@ -39,6 +33,7 @@ function App() {
         height: 18px;
         border-radius: 50%;
         background-color: #2A93EE;
+        border: 2px solid white;
         box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
         animation: pulse 1.5s infinite;
       }
@@ -48,6 +43,7 @@ function App() {
         height: 18px;
         border-radius: 50%;
         background-color: #EE2A2A;
+        border: 2px solid white;
         box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
       }
       
@@ -62,56 +58,148 @@ function App() {
           box-shadow: 0 0 0 0 rgba(42, 147, 238, 0);
         }
       }
+      
+      .locate-button {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 30px;
+        height: 30px;
+        font-size: 16px;
+        cursor: pointer;
+      }
     `;
     document.head.appendChild(style);
 
-    // Add locate control with callback for when location is found
-    const locateControl = L.control.locate({
-      position: 'topleft',
-      onLocationFound: (e) => {
-        // When location is found, set as origin
-        handleLocationFound(e);
-      },
-    }).addTo(mapInstance);
+    // Add locate button
+    const locateButton = L.control({position: 'topleft'});
+    locateButton.onAdd = function() {
+      const div = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+      div.innerHTML = '<a class="locate-button" href="#" title="Show my location">📍</a>';
+      
+      L.DomEvent.on(div, 'click', function(e) {
+        L.DomEvent.preventDefault(e);
+        L.DomEvent.stopPropagation(e);
+        mapInstance.locate({setView: true, maxZoom: 16});
+      });
+      
+      return div;
+    };
+    locateButton.addTo(mapInstance);
 
-    // Add event listener for location found events
-    mapInstance.on('locationfound', handleLocationFound);
-
-    // Setup provider for geocoding searches
-    const provider = new window.GeoSearch.OpenStreetMapProvider();
+    // Set map instance to state
+    setMap(mapInstance);
+    
+    // Force map to invalidate its size after mounting
+    setTimeout(() => {
+      mapInstance.invalidateSize();
+    }, 100);
 
     // Cleanup function
     return () => {
-      if (routeControl) {
-        routeControl.removeFrom(mapInstance);
+      if (mapInstance) {
+        mapInstance.remove();
       }
-      mapInstance.remove();
       document.head.removeChild(style);
     };
   }, []);
 
-  // Handle when user's location is found
-  const handleLocationFound = (e) => {
+  // Set up event listeners for the map
+  useEffect(() => {
     if (!map) return;
     
-    // Only update the origin input with the user's location
-    // without setting a marker on the map
+    // Handle location found event
+    const handleLocationFound = (e) => {
+      const latlng = e.latlng;
+      
+      // Get address for the location
+      reverseGeocode(latlng)
+        .then(address => {
+          // Update origin value
+          setOriginValue(address);
+          
+          // Create or update origin marker
+          updateMarker(latlng, true);
+          
+          // Automatically search with this location
+          if (destinationMarker) {
+            // If we have both markers, fit bounds to show both
+            const bounds = L.latLngBounds([
+              latlng,
+              destinationMarker.getLatLng()
+            ]);
+            map.fitBounds(bounds, { padding: [50, 50] });
+            
+            // Create route
+            createRoute(latlng, destinationMarker.getLatLng());
+          } else {
+            // Just center on the origin
+            map.setView(latlng, 15);
+          }
+        })
+        .catch(error => console.error("Reverse geocoding failed:", error));
+    };
     
-    // Get the address for the location and update the origin input
-    reverseGeocode(e.latlng)
-      .then(address => {
-        setOriginValue(address);
-        if (originInputRef.current) {
-          originInputRef.current.value = address;
-        }
-      })
-      .catch(error => console.error("Reverse geocoding failed:", error));
+    // Add event listener for location found
+    map.on('locationfound', handleLocationFound);
     
-    // Note: We're not setting a marker or updating the map view here
+    // Cleanup event listeners
+    return () => {
+      map.off('locationfound', handleLocationFound);
+      
+      if (routeControl) {
+        routeControl.removeFrom(map);
+      }
+    };
+  }, [map, originMarker, destinationMarker]);
+
+  // Create or update a marker
+  const updateMarker = (latlng, isOrigin) => {
+    if (!map) return;
+    
+    if (isOrigin) {
+      if (originMarker) {
+        originMarker.setLatLng(latlng);
+      } else {
+        const icon = L.divIcon({
+          html: `<div class="origin-marker"></div>`,
+          className: '',
+          iconSize: [18, 18],
+          iconAnchor: [9, 9]
+        });
+        
+        const marker = L.marker(latlng, { 
+          icon: icon,
+          title: "Origin" 
+        }).addTo(map);
+        
+        setOriginMarker(marker);
+      }
+    } else {
+      if (destinationMarker) {
+        destinationMarker.setLatLng(latlng);
+      } else {
+        const icon = L.divIcon({
+          html: `<div class="destination-marker"></div>`,
+          className: '',
+          iconSize: [18, 18],
+          iconAnchor: [9, 9]
+        });
+        
+        const marker = L.marker(latlng, { 
+          icon: icon,
+          title: "Destination" 
+        }).addTo(map);
+        
+        setDestinationMarker(marker);
+      }
+    }
   };
 
   // Reverse geocode a location to get an address
   const reverseGeocode = async (latlng) => {
+    if (!window.GeoSearch) return `${latlng.lat.toFixed(5)}, ${latlng.lng.toFixed(5)}`;
+    
     const provider = new window.GeoSearch.OpenStreetMapProvider();
     try {
       const results = await provider.search({
@@ -128,6 +216,11 @@ function App() {
   const searchLocation = async (query, isOrigin) => {
     if (!map || !query) return;
     
+    if (!window.GeoSearch) {
+      console.error("GeoSearch not available");
+      return;
+    }
+    
     const provider = new window.GeoSearch.OpenStreetMapProvider();
     try {
       const results = await provider.search({ query });
@@ -136,48 +229,16 @@ function App() {
         const { x, y, label } = results[0];
         const latlng = L.latLng(y, x);
         
-        // Update the appropriate marker
+        // Update the appropriate value and marker
         if (isOrigin) {
-          if (originMarker) {
-            originMarker.setLatLng(latlng);
-          } else {
-            const markerHtml = `<div class="origin-marker"></div>`;
-            const icon = L.divIcon({
-              html: markerHtml,
-              className: '',
-              iconSize: [18, 18],
-              iconAnchor: [9, 9]
-            });
-            
-            const marker = L.marker(latlng, { 
-              icon: icon,
-              title: "Origin" 
-            }).addTo(map);
-            setOriginMarker(marker);
-          }
           setOriginValue(label);
+          updateMarker(latlng, true);
         } else {
-          if (destinationMarker) {
-            destinationMarker.setLatLng(latlng);
-          } else {
-            const markerHtml = `<div class="destination-marker"></div>`;
-            const icon = L.divIcon({
-              html: markerHtml,
-              className: '',
-              iconSize: [18, 18],
-              iconAnchor: [9, 9]
-            });
-            
-            const marker = L.marker(latlng, { 
-              icon: icon,
-              title: "Destination" 
-            }).addTo(map);
-            setDestinationMarker(marker);
-          }
           setDestinationValue(label);
+          updateMarker(latlng, false);
         }
         
-        // Update map view to show both markers if they exist
+        // Update map view and create route if needed
         updateMapView();
       }
     } catch (error) {
@@ -215,6 +276,7 @@ function App() {
     // Remove existing route if there is one
     if (routeControl) {
       routeControl.removeFrom(map);
+      setRouteControl(null);
     }
     
     // Create new route
@@ -228,6 +290,12 @@ function App() {
       addWaypoints: false,
       draggableWaypoints: false,
       fitSelectedRoutes: false,
+      createMarker: function() { return null; },
+      lineOptions: {
+        styles: [
+          {color: '#2A93EE', opacity: 0.8, weight: 6}
+        ]
+      },
       altLineOptions: {
         styles: [
           {color: 'black', opacity: 0.15, weight: 9},
