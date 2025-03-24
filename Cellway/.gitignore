@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+
+# Ignore environment files
+.env
+# DO NOT CHANGE (.env) - it pertains to an environment needed to protect credentials from public/online risk by ensure it is never pushed to GitHub
