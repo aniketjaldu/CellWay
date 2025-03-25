@@ -30,7 +30,8 @@ def get_route(start_lat, start_lng, end_lat, end_lng):
     params = {
         'overview': 'full',
         'geometries': 'geojson',
-        'steps': 'true'
+        'steps': 'true',
+        'alternatives': 'true'  # Request alternative routes
     }
     
     response = requests.get(url, params=params)

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import './App.css';
 import SearchIcon from './assets/svg/search-icon.svg';
 import CloseIcon from './assets/svg/close-icon.svg';
+import axios from 'axios';
 
 function App() {
   // Map references
@@ -197,15 +198,14 @@ function App() {
   // Reverse geocode a location to get an address
   const reverseGeocode = async (latlng) => {
     try {
-      const response = await fetch(
-        `https://api.maptiler.com/geocoding/${latlng.lng},${latlng.lat}.json?key=${mapTilerKey}`
-      );
+      const response = await axios.get(`http://localhost:5001/api/reverse-geocode`, {
+        params: {
+          lat: latlng.lat,
+          lng: latlng.lng
+        }
+      });
       
-      if (!response.ok) {
-        throw new Error('Reverse geocoding failed');
-      }
-      
-      const data = await response.json();
+      const data = response.data;
       
       if (data.features && data.features.length > 0) {
         return data.features[0].place_name || `${latlng.lat.toFixed(5)}, ${latlng.lng.toFixed(5)}`;
@@ -223,14 +223,13 @@ function App() {
     if (!map || !query) return;
     
     try {
-      // Use backend API instead of direct API call
-      const response = await fetch(`http://localhost:5000/api/geocode?query=${encodeURIComponent(query)}`);
+      const response = await axios.get(`http://localhost:5001/api/geocode`, {
+        params: {
+          query: query
+        }
+      });
       
-      if (!response.ok) {
-        throw new Error('Geocoding failed');
-      }
-      
-      const data = await response.json();
+      const data = response.data;
       
       if (data.features && data.features.length > 0) {
         const feature = data.features[0];
@@ -258,29 +257,30 @@ function App() {
 
   // Get autocomplete suggestions
   const getSuggestions = useCallback(async (query, isOrigin) => {
-    if (!query || query.length < 2) {
+    if (!query) {
       isOrigin ? setOriginSuggestions([]) : setDestinationSuggestions([]);
       return;
     }
     
     try {
-      const response = await fetch(
-        `https://api.maptiler.com/geocoding/${encodeURIComponent(query)}.json?key=${mapTilerKey}&autocomplete=true`
-      );
+      const response = await axios.get(`http://localhost:5001/api/geocode`, {
+        params: {
+          query: query
+        }
+      });
       
-      if (!response.ok) {
-        throw new Error('Autocomplete failed');
-      }
+      const data = response.data;
       
-      const data = await response.json();
-      
-      if (data.features) {
+      if (data.features && data.features.length > 0) {
         isOrigin 
           ? setOriginSuggestions(data.features) 
           : setDestinationSuggestions(data.features);
+      } else {
+        isOrigin ? setOriginSuggestions([]) : setDestinationSuggestions([]);
       }
     } catch (error) {
-      console.error("Autocomplete error:", error);
+      console.error("Error getting suggestions:", error);
+      isOrigin ? setOriginSuggestions([]) : setDestinationSuggestions([]);
     }
   }, []);
 
@@ -405,13 +405,6 @@ function App() {
     setRouteControl(newRouteControl);
     routeControlRef.current = newRouteControl;
   }, [map, routeControl]);
-
-  // Handle form submission
-  const handleSubmit = useCallback((e, isOrigin) => {
-    e.preventDefault();
-    const value = isOrigin ? originValue : destinationValue;
-    searchLocation(value, isOrigin);
-  }, [originValue, destinationValue, searchLocation]);
 
   return (
     <div className="app-container">
