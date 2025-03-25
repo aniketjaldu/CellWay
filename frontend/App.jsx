@@ -35,8 +35,7 @@ function App() {
   const originInputRef = useRef(null);
   
   // API key
-  const mapTilerKey = 'N8hd8OyxrzTQyHyfLa65';
-  const openCellIdKey = 'pk.16c0e946b00c63e75302246673d5a700';
+  const mapTilerKey = import.meta.env.VITE_MAPTILER_KEY;
 
   // Toggle search expansion
   const toggleSearch = () => {
