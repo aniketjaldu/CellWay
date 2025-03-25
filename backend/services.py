@@ -3,6 +3,7 @@ from config import Config
 
 def geocode_location(query):
     """Search for a location using MapTiler geocoding API"""
+    """Looks for location based on the given string(Address, State, Zip Code) query > returns Lat, Lon"""
     url = f"https://api.maptiler.com/geocoding/{query}.json"
     params = {
         'key': Config.MAPTILER_KEY
@@ -13,6 +14,8 @@ def geocode_location(query):
 
 def reverse_geocode(lng, lat):
     """Get an address from coordinates using MapTiler API"""
+    """Returns Lat, Lon < given string(Address, State, Zip Code) """
+
     url = f"https://api.maptiler.com/geocoding/{lng},{lat}.json"
     params = {
         'key': Config.MAPTILER_KEY
