@@ -98,6 +98,343 @@ html, body {
   background-color: #005f86;
 }
 
+/* Reset for map container */
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+/* Override the root container styles for map */
+#root {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  width: 100%;
+  text-align: initial;
+}
+
+/* Map specific styles */
+#map {
+  height: 100vh;
+  width: 100%;
+  z-index: 0;
+}
+
+/* Preserve original styles for other elements */
+.logo {
+  height: 6em;
+  padding: 1.5em;
+  will-change: filter;
+  transition: filter 300ms;
+}
+.logo:hover {
+  filter: drop-shadow(0 0 2em #646cffaa);
+}
+.logo.react:hover {
+  filter: drop-shadow(0 0 2em #61dafbaa);
+}
+
+@keyframes logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  a:nth-of-type(2) .logo {
+    animation: logo-spin infinite 20s linear;
+  }
+}
+
+.card {
+  padding: 2em;
+}
+
+.read-the-docs {
+  color: #888;
+}
+
+/* App container styles */
+.app-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+#map {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  flex: 1;
+  width: 100%;
+}
+
+/* Custom marker styles */
+.origin-marker {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background-color: #2A93EE;
+  border: 2px solid white;
+  box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
+  animation: pulse 1.5s infinite;
+}
+
+.destination-marker {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background-color: #EE2A2A;
+  border: 2px solid white;
+  box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(42, 147, 238, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 15px rgba(42, 147, 238, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(42, 147, 238, 0);
+  }
+}
+
+.locate-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+/* Button container */
+.button-container {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1001;
+}
+
+.search-button {
+  width: 45px;
+  height: 45px;
+  border-radius: 12px;
+  background: white;
+  border: none;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 20px;
+  padding: 0;
+  color: #333;
+}
+
+.search-button:hover {
+  transform: scale(1.05);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* Search container */
+.search-container {
+  position: absolute;
+  top: 65px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  width: 80%;
+  max-width: 500px;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(5px);
+  border-radius: 12px;
+  padding: 15px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  animation: slideDown 0.5s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+.search-content {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.search-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 5px;
+  font-weight: 500;
+}
+
+.search-form {
+  width: 100%;
+  position: relative;
+  margin-bottom: 5px;
+  animation: fadeIn 0.4s ease forwards;
+  animation-delay: 0.1s;
+  opacity: 0;
+}
+
+.search-form:nth-child(3) {
+  animation-delay: 0.2s;
+}
+
+.input-group {
+  display: flex;
+  align-items: center;
+  background: #f7f7f7;
+  border-radius: 12px;
+  overflow: hidden;
+  transition: all 0.2s ease;
+  position: relative;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.input-group:focus-within {
+  box-shadow: 0 0 0 2px rgba(42, 147, 238, 0.5);
+  background: white;
+}
+
+.input-container {
+  flex: 1;
+}
+
+.input-group input {
+  width: 100%;
+  padding: 16px;
+  border: none;
+  background: transparent;
+  font-size: 16px;
+  color: #333;
+}
+
+.input-group input:focus {
+  outline: none;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.suggestions-dropdown {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(100% - 40px);
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+  z-index: 1001;
+  max-height: 250px;
+  overflow-y: auto;
+  animation: dropdownFadeIn 0.2s ease forwards;
+}
+
+@keyframes dropdownFadeIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+.origin-suggestions {
+  top: 122px; /* Position below the origin input */
+}
+
+.destination-suggestions {
+  top: 190px; /* Position below the destination input */
+}
+
+.suggestion-item {
+  padding: 10px 15px;
+  cursor: pointer;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.suggestion-item:last-child {
+  border-bottom: none;
+}
+
+.suggestion-item:hover {
+  background-color: #f5f5f5;
+}
+
+.route-info {
+  margin-top: 10px;
+  background: white;
+  border-radius: 8px;
+  padding: 10px 15px;
+  display: flex;
+  justify-content: space-around;
+  animation: fadeIn 0.4s ease forwards;
+  animation-delay: 0.3s;
+  opacity: 0;
+}
+
+.route-detail {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.route-icon {
+  font-size: 18px;
+}
+
+.loading-indicator {
+  margin-top: 10px;
+  background: white;
+  border-radius: 8px;
+  padding: 10px 15px;
+  text-align: center;
+  font-style: italic;
+  animation: fadeIn 0.4s ease forwards;
+  animation-delay: 0.3s;
+  opacity: 0;
+} 
+
 #map {
   flex: 1;
   width: 100%;

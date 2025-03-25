@@ -60,7 +60,7 @@ def save_route():
 @api_bp.route('/saved-routes', methods=['GET'])
 def get_saved_routes():
     """Endpoint for retrieving saved routes"""
-    
+
     # Dummy user_id for now
     user_id = request.args.get('user_id', 'anonymous')
     

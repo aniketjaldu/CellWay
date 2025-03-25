@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import './App.css';
+import SearchIcon from './assets/svg/search-icon.svg';
+import CloseIcon from './assets/svg/close-icon.svg';
 
 function App() {
   // Map references
@@ -56,52 +58,6 @@ function App() {
       minZoom: 3
     }).addTo(mapInstance);
 
-    // Add custom CSS for markers
-    const style = document.createElement('style');
-    style.innerHTML = `
-      .origin-marker {
-        width: 18px;
-        height: 18px;
-        border-radius: 50%;
-        background-color: #2A93EE;
-        border: 2px solid white;
-        box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
-        animation: pulse 1.5s infinite;
-      }
-      
-      .destination-marker {
-        width: 18px;
-        height: 18px;
-        border-radius: 50%;
-        background-color: #EE2A2A;
-        border: 2px solid white;
-        box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
-      }
-      
-      @keyframes pulse {
-        0% {
-          box-shadow: 0 0 0 0 rgba(42, 147, 238, 0.7);
-        }
-        70% {
-          box-shadow: 0 0 0 15px rgba(42, 147, 238, 0);
-        }
-        100% {
-          box-shadow: 0 0 0 0 rgba(42, 147, 238, 0);
-        }
-      }
-      
-      .locate-button {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 30px;
-        height: 30px;
-        font-size: 16px;
-        cursor: pointer;
-      }
-    `;
-    document.head.appendChild(style);
-
     // Add locate button
     const locateButton = L.control({position: 'topleft'});
     locateButton.onAdd = function() {
@@ -139,9 +95,6 @@ function App() {
     return () => {
       if (mapInstance) {
         mapInstance.remove();
-      }
-      if (style.parentNode) {
-        document.head.removeChild(style);
       }
     };
   }, []);
@@ -471,14 +424,9 @@ function App() {
             aria-label={searchExpanded ? "Close search" : "Open search"}
           >
             {searchExpanded ? (
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M1 1L13 13M1 13L13 1" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-              </svg>
+              <img src={CloseIcon} alt="Close" />
             ) : (
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="2"/>
-                <path d="M12 12L16 16" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-              </svg>
+              <img src={SearchIcon} alt="Search" />
             )}
           </button>
         </div>
@@ -573,221 +521,6 @@ function App() {
           </div>
         )}
       </div>
-      
-      <style>{`
-        .app-container {
-          position: relative;
-          width: 100%;
-          height: 100%;
-        }
-        
-        #map {
-          width: 100%;
-          height: 100%;
-          position: absolute;
-          top: 0;
-          left: 0;
-        }
-        
-        .button-container {
-          position: absolute;
-          top: 10px;
-          left: 50%;
-          transform: translateX(-50%);
-          z-index: 1001;
-        }
-        
-        .search-button {
-          width: 45px;
-          height: 45px;
-          border-radius: 12px;
-          background: white;
-          border: none;
-          box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          cursor: pointer;
-          transition: all 0.3s ease;
-          font-size: 20px;
-          padding: 0;
-          color: #333;
-        }
-        
-        .search-button:hover {
-          transform: scale(1.05);
-          box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
-        }
-        
-        .search-container {
-          position: absolute;
-          top: 65px;
-          left: 50%;
-          transform: translateX(-50%);
-          z-index: 1000;
-          width: 80%;
-          max-width: 500px;
-          background: rgba(255, 255, 255, 0.9);
-          backdrop-filter: blur(5px);
-          border-radius: 12px;
-          padding: 15px;
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-          animation: slideDown 0.5s cubic-bezier(0.25, 1, 0.5, 1) forwards;
-        }
-        
-        @keyframes slideDown {
-          from {
-            opacity: 0;
-            transform: translateX(-50%) translateY(-10px);
-          }
-          to {
-            opacity: 1;
-            transform: translateX(-50%) translateY(0);
-          }
-        }
-        
-        .search-content {
-          width: 100%;
-          display: flex;
-          flex-direction: column;
-          gap: 15px;
-        }
-        
-        .search-header {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          margin-bottom: 5px;
-          font-weight: 500;
-        }
-        
-        .search-form {
-          width: 100%;
-          position: relative;
-          margin-bottom: 5px;
-          animation: fadeIn 0.4s ease forwards;
-          animation-delay: 0.1s;
-          opacity: 0;
-        }
-        
-        .search-form:nth-child(3) {
-          animation-delay: 0.2s;
-        }
-        
-        .input-group {
-          display: flex;
-          align-items: center;
-          background: #f7f7f7;
-          border-radius: 12px;
-          overflow: hidden;
-          transition: all 0.2s ease;
-          position: relative;
-          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-        }
-        
-        .input-group:focus-within {
-          box-shadow: 0 0 0 2px rgba(42, 147, 238, 0.5);
-          background: white;
-        }
-        
-        .input-container {
-          flex: 1;
-        }
-        
-        .input-group input {
-          width: 100%;
-          padding: 16px;
-          border: none;
-          background: transparent;
-          font-size: 16px;
-          color: #333;
-        }
-        
-        .input-group input:focus {
-          outline: none;
-        }
-        
-        @keyframes fadeIn {
-          from {
-            opacity: 0;
-            transform: translateY(10px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        
-        .suggestions-dropdown {
-          position: absolute;
-          left: 50%;
-          transform: translateX(-50%);
-          width: calc(100% - 40px);
-          background: white;
-          border-radius: 12px;
-          box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
-          z-index: 1001;
-          max-height: 250px;
-          overflow-y: auto;
-          animation: dropdownFadeIn 0.2s ease forwards;
-        }
-        
-        .origin-suggestions {
-          top: 122px; /* Position below the origin input */
-        }
-        
-        .destination-suggestions {
-          top: 190px; /* Position below the destination input */
-        }
-        
-        .suggestion-item {
-          padding: 10px 15px;
-          cursor: pointer;
-          border-bottom: 1px solid #f0f0f0;
-        }
-        
-        .suggestion-item:last-child {
-          border-bottom: none;
-        }
-        
-        .suggestion-item:hover {
-          background-color: #f5f5f5;
-        }
-        
-        .route-info {
-          margin-top: 10px;
-          background: white;
-          border-radius: 8px;
-          padding: 10px 15px;
-          display: flex;
-          justify-content: space-around;
-          animation: fadeIn 0.4s ease forwards;
-          animation-delay: 0.3s;
-          opacity: 0;
-        }
-        
-        .route-detail {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-        }
-        
-        .route-icon {
-          font-size: 18px;
-        }
-        
-        .loading-indicator {
-          margin-top: 10px;
-          background: white;
-          border-radius: 8px;
-          padding: 10px 15px;
-          text-align: center;
-          font-style: italic;
-          animation: fadeIn 0.4s ease forwards;
-          animation-delay: 0.3s;
-          opacity: 0;
-        }
-      `}</style>
     </div>
   );
 }
