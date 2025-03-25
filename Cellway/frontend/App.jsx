@@ -34,6 +34,7 @@ function App() {
   
   // API key
   const mapTilerKey = 'N8hd8OyxrzTQyHyfLa65';
+  const openCellIdKey = 'pk.16c0e946b00c63e75302246673d5a700';
 
   // Toggle search expansion
   const toggleSearch = () => {
@@ -52,7 +53,7 @@ function App() {
       attribution: '<a href="https://www.maptiler.com/copyright/" target="_blank">&copy; MapTiler</a> <a href="https://www.openstreetmap.org/copyright" target="_blank">&copy; OpenStreetMap contributors</a>',
       tileSize: 512,
       zoomOffset: -1,
-      minZoom: 1
+      minZoom: 3
     }).addTo(mapInstance);
 
     // Add custom CSS for markers
@@ -270,12 +271,11 @@ function App() {
     if (!map || !query) return;
     
     try {
-      const response = await fetch(
-        `https://api.maptiler.com/geocoding/${encodeURIComponent(query)}.json?key=${mapTilerKey}`
-      );
+      // Use backend API instead of direct API call
+      const response = await fetch(`http://localhost:5000/api/geocode?query=${encodeURIComponent(query)}`);
       
       if (!response.ok) {
-        throw new Error('Search failed');
+        throw new Error('Geocoding failed');
       }
       
       const data = await response.json();
@@ -300,9 +300,9 @@ function App() {
         updateMapView();
       }
     } catch (error) {
-      console.error("Search error:", error);
+      console.error("Geocoding error:", error);
     }
-  }, [map, updateMarker]);
+  }, [map, originMarker, destinationMarker, setOriginMarker, setDestinationMarker, setOriginValue, setDestinationValue]);
 
   // Get autocomplete suggestions
   const getSuggestions = useCallback(async (query, isOrigin) => {
