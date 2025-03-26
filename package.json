@@ -11,13 +11,16 @@
   },
   "dependencies": {
     "@geoapify/leaflet-address-search-plugin": "^1.0.2",
+    "@mapbox/polyline": "^1.2.1",
     "@maptiler/leaflet-maptilersdk": "^4.0.2",
+    "axios": "^1.8.4",
     "leaflet": "^1.9.4",
     "leaflet-control-geocoder": "^3.1.0",
     "leaflet-geosearch": "^4.2.0",
     "leaflet.locatecontrol": "^0.83.1",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "react-hot-toast": "^2.5.2"
   },
   "devDependencies": {
     "@eslint/js": "^9.21.0",
