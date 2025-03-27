@@ -225,7 +225,7 @@ html, body {
 
 .input-group input {
   width: 100%;
-  padding: 14px 0;
+  padding: 14px 60px 14px 0;
   border: none;
   background: transparent;
   color: #333;
@@ -1593,4 +1593,76 @@ html, body {
 .route-selection-option.disabled .calculating {
   color: #666;
   font-style: italic;
+}
+
+/* Tower Popup Styling */
+.tower-popup {
+  font-family: 'Roboto', sans-serif;
+  min-width: 150px;
+  max-width: 180px;
+  padding: 0;
+}
+
+.tower-popup-header {
+  background-color: #f0f0f0;
+  padding: 8px 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #ddd;
+  border-radius: 4px 4px 0 0;
+}
+
+.tower-popup-content {
+  padding: 8px 10px;
+  line-height: 1.5;
+}
+
+.tower-popup-content div {
+  margin-bottom: 4px;
+}
+
+.signal-badge {
+  padding: 3px 6px;
+  border-radius: 3px;
+  font-size: 0.85em;
+  font-weight: bold;
+  color: white;
+}
+
+.signal-badge.weak {
+  background-color: #e53935;
+}
+
+.signal-badge.medium {
+  background-color: #fb8c00;
+}
+
+.signal-badge.strong {
+  background-color: #43a047;
+}
+
+/* Clear input button styling */
+.clear-input {
+  position: absolute;
+  right: 0px;
+  top: 45%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  font-size: 18px;
+  color: #999;
+  cursor: pointer;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  z-index: 2;
+  transition: all 0.2s ease;
+}
+
+.clear-input:hover {
+  color: #333;
 }

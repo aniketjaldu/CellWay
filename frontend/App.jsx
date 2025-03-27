@@ -54,6 +54,7 @@ function App() {
   const cleanupAnimationRef = useRef(null);
   const clearRouteDisplayRef = useRef(null);
   const getRouteLineColorRef = useRef(null);
+  const handleClearInputRef = useRef(null);
   // --- End Refs for Functions ---
 
   // Map references
@@ -151,6 +152,9 @@ function App() {
     balanced: null,
     allRoutes: []
   });
+  
+  // Add missing state for allRoutes
+  const [allRoutes, setAllRoutes] = useState([null, null, null]); // Array to hold the three route types
   
   // Store cell towers for each route type (less critical now with frontend filtering)
   const [computedRouteTowers, setComputedRouteTowers] = useState({
@@ -357,26 +361,85 @@ function App() {
   }, [map, originMarker, destinationMarker]); // Dependencies: map, marker states
   updateMarkerRef.current = updateMarker;
 
-  // Fetch Cell Towers Function (Requirement 1 & used by Route Calc)
+  // Fetch Cell Towers Function
   const fetchCellTowers = useCallback(async (bounds) => {
     if (!map) return []; // Return empty array if map not ready
+    
+    // Generate a cache key based on the bounds (rounded to reduce variations)
+    const roundedBounds = {
+      min_lat: Math.floor(bounds.min_lat * 100) / 100,
+      min_lng: Math.floor(bounds.min_lng * 100) / 100,
+      max_lat: Math.ceil(bounds.max_lat * 100) / 100,
+      max_lng: Math.ceil(bounds.max_lng * 100) / 100
+    };
+    
+    const boundsKey = `${roundedBounds.min_lat},${roundedBounds.min_lng},${roundedBounds.max_lat},${roundedBounds.max_lng}`;
+    const cacheKey = `tower_cache_${boundsKey}`;
+    
+    // Check for cached data first
+    const cachedData = localStorage.getItem(cacheKey);
+    if (cachedData) {
+      try {
+        const parsed = JSON.parse(cachedData);
+        // Check if cache is still valid (less than 30 minutes old)
+        if (parsed.timestamp && (Date.now() - parsed.timestamp < 30 * 60 * 1000)) {
+          console.log(`Using ${parsed.towers.length} cached towers from storage`);
+          allTowers.current = parsed.towers;
+          return parsed.towers;
+        } else {
+          console.log("Tower cache expired, fetching fresh data");
+          localStorage.removeItem(cacheKey);
+        }
+      } catch (err) {
+        console.warn("Error parsing cached tower data", err);
+        localStorage.removeItem(cacheKey);
+      }
+    }
     
     try {
       let { min_lat, min_lng, max_lat, max_lng } = bounds;
       console.log(`Fetching cell towers in area: ${min_lat},${min_lng},${max_lat},${max_lng}`);
       
-      const response = await api.get('/towers', { params: { min_lat, min_lng, max_lat, max_lng } });
+      // Show loading toast for better UX
+      const loadingToast = toast.loading("Fetching cell tower data...", { position: "top-center" });
+      
+      const response = await api.get('/towers', { 
+        params: { min_lat, min_lng, max_lat, max_lng },
+        timeout: 20000 // Add timeout to prevent hanging requests
+      });
+      
+      // Dismiss loading toast
+      toast.dismiss(loadingToast);
+      
       const towers = response.data?.towers || [];
       console.log(`Received ${towers.length} cell towers from the backend`);
       
       if (towers.length > 0) {
+        // Cache the tower data for future use
+        try {
+          localStorage.setItem(cacheKey, JSON.stringify({
+            towers: towers,
+            timestamp: Date.now(),
+            bounds: roundedBounds
+          }));
+        } catch (cacheErr) {
+          console.warn("Could not cache tower data", cacheErr);
+        }
+        
         allTowers.current = towers; // Update the main tower store
-        // setCellTowers(towers); // Update state if needed elsewhere, maybe not necessary
-        // Don't automatically setShowCellTowers(true) here
+        
+        // Show success message
+        if (towers.length > 0) {
+          toast.success(`Found ${towers.length} cell towers in this area`, { 
+            position: "top-center", 
+            autoClose: 2000,
+            icon: "📡"
+          });
+        }
+        
         return towers; // Return fetched towers
       } else {
         allTowers.current = []; // Clear if none found
-        // setCellTowers([]);
         toast.warning("No cell towers found in this area", { position: "top-center", autoClose: 3000 });
       }
       return [];
@@ -384,7 +447,6 @@ function App() {
       console.error("Error fetching cell tower data:", error);
       toast.error("Error fetching cell tower data", { position: "top-center", autoClose: 3000 });
       allTowers.current = []; // Clear on error
-      // setCellTowers([]);
       return []; // Return empty array on error
     }
   }, [map]); // Dependency: map
@@ -432,6 +494,36 @@ function App() {
     }, 200);
   }, []);
   handleInputBlurRef.current = handleInputBlur;
+
+  // Handle Clear Input Function
+  const handleClearInput = useCallback((isOrigin) => {
+    if (isOrigin) {
+      setOriginValue('');
+      setOriginSuggestions([]);
+      setShowOriginSuggestions(false);
+      // Clear origin marker and route point if exists
+      if (originMarker) {
+        updateMarkerRef.current?.(null, true);
+        setCurrentRoutePoints(prev => ({ ...prev, start: null }));
+      }
+    } else {
+      setDestinationValue('');
+      setDestinationSuggestions([]);
+      setShowDestinationSuggestions(false);
+      // Clear destination marker and route point if exists
+      if (destinationMarker) {
+        updateMarkerRef.current?.(null, false);
+        setCurrentRoutePoints(prev => ({ ...prev, end: null }));
+      }
+    }
+    
+    // Clear route if either origin or destination is cleared
+    clearRouteDisplayRef.current?.();
+    setAllRoutesComputed(false);
+    setRoutesAreLoading(false);
+    setIsLoadingRoute(false);
+  }, [originMarker, destinationMarker]);
+  handleClearInputRef.current = handleClearInput;
 
   // Handle Suggestion Select Function (Triggers Initial Tower Fetch)
   const handleSuggestionSelect = useCallback(async (suggestion, isOrigin) => {
@@ -518,21 +610,26 @@ function App() {
       start: { lat: originLatLng.lat, lng: originLatLng.lng },
       end: { lat: destLatLng.lat, lng: destLatLng.lng }
     };
+    
+    // Update state, but don't rely on it for immediate calculation
     setCurrentRoutePoints(routePointsForCalc);
 
-    // Reset computation flags and previous route
+    // Force reset ALL route calculation state
+    console.log("RESET: Clearing all previous route calculation state");
+    window._routeCalcStartTime = null;
+    setRoutesAreLoading(false);
+    setIsLoadingRoute(false);
     setAllRoutesComputed(false);
     setComputedRoutes({ fastest: null, cell_coverage: null, balanced: null, allRoutes: [] });
     setComputedRouteTowers({ fastest: [], cell_coverage: [], balanced: [] });
-    clearRouteDisplayRef.current?.(); // Clear previous route line etc.
     
+    // Clear previous route display
+    clearRouteDisplayRef.current?.();
     setSearchExpanded(false);
-    setIsLoadingRoute(true);
-    setRoutesAreLoading(true);
 
-    // Fetch cell towers AGAIN for the potentially larger route calculation area
+    // Fetch cell towers for the route calculation area with increased padding
     console.log("Fetching towers for route calculation area...");
-    const routePadding = 0.1; // Padding for route calculation
+    const routePadding = 0.1;
     const towerBounds = {
       min_lat: Math.min(originLatLng.lat, destLatLng.lat) - routePadding,
       min_lng: Math.min(originLatLng.lng, destLatLng.lng) - routePadding,
@@ -540,18 +637,365 @@ function App() {
       max_lng: Math.max(originLatLng.lng, destLatLng.lng) + routePadding
     };
 
-    // Fetch towers and THEN calculate routes
-    fetchCellTowersRef.current?.(towerBounds).then(fetchedTowersForRoute => {
-      // allTowers.current is updated inside fetchCellTowers
-      console.log(`Using ${allTowers.current.length} towers for route calculation.`);
-      calculateAllRouteTypesRef.current?.(routePointsForCalc);
-    }).catch(error => {
-      console.error("Error fetching towers for route calculation:", error);
-      // Still try to calculate routes even if tower fetch failed
-      calculateAllRouteTypesRef.current?.(routePointsForCalc);
-    });
+    // Fetch towers and then start a clean route calculation
+    fetchCellTowersRef.current?.(towerBounds)
+      .then(fetchedTowersForRoute => {
+        console.log(`Using ${allTowers.current.length} towers for route calculation.`);
+        
+        // Set loading flags and start time
+        setIsLoadingRoute(true);
+        setRoutesAreLoading(true);
+        window._routeCalcStartTime = Date.now();
+        console.log("STARTING NEW CALCULATION with timestamp:", window._routeCalcStartTime);
+        
+        // Use setTimeout to ensure render cycle completes
+        setTimeout(() => {
+          // Double check state is consistent
+          if (!window._routeCalcStartTime) {
+            window._routeCalcStartTime = Date.now();
+          }
+          
+          // Call calculation function with direct route points instead of relying on state
+          calculateRouteWithPoints(routePointsForCalc);
+        }, 50);
+      })
+      .catch(error => {
+        console.error("Error fetching towers for route calculation:", error);
+        // Still try to calculate routes even if tower fetch fails
+        setIsLoadingRoute(true);
+        setRoutesAreLoading(true);
+        window._routeCalcStartTime = Date.now();
+        
+        setTimeout(() => {
+          calculateRouteWithPoints(routePointsForCalc);
+        }, 50);
+      });
   }, [map]); // Dependencies
   updateMapViewRef.current = updateMapView;
+
+  // Helper function to calculate routes with direct point parameters
+  const calculateRouteWithPoints = (routePoints) => {
+    console.log("CALCULATE WITH POINTS:", routePoints);
+    
+    // Critical validation - ensure we have valid route points
+    if (!routePoints?.start?.lat || !routePoints?.start?.lng || 
+        !routePoints?.end?.lat || !routePoints?.end?.lng) {
+      console.error("CALCULATE: Cannot calculate routes - missing route points");
+      setRoutesAreLoading(false);
+      setIsLoadingRoute(false);
+      window._routeCalcStartTime = null;
+      return;
+    }
+    
+    // Call the real calculation function with the points
+    calculateAllRouteTypesWithPoints(routePoints);
+  };
+
+  // Modified calculate function that takes points parameter
+  const calculateAllRouteTypesWithPoints = async (points) => {
+    console.log("CALCULATE: Starting route calculation with:", points);
+    
+    // Note: We're intentionally NOT checking routesAreLoading here to avoid getting stuck
+    console.log("CALCULATE: Proceeding with route calculation regardless of previous state");
+    
+    // Ensure we have a calculation start time
+    if (!window._routeCalcStartTime) {
+      window._routeCalcStartTime = Date.now();
+    }
+    
+    // Set loading flags - regardless of previous state
+    setRoutesAreLoading(true);
+    setIsLoadingRoute(true);
+    setAllRoutesComputed(false);
+    
+    // Check for cached routes
+    const cacheKey = `${points.start.lat},${points.start.lng}|${points.end.lat},${points.end.lng}`;
+    const cachedResult = localStorage.getItem(`route_cache_${cacheKey}`);
+    
+    if (cachedResult) {
+      try {
+        const parsed = JSON.parse(cachedResult);
+        console.log("CALCULATE: Using cached route data");
+        setComputedRoutes(parsed.routes);
+        setComputedRouteTowers(parsed.towers);
+        setAllRoutes([parsed.routes.fastest, parsed.routes.cell_coverage, parsed.routes.balanced]);
+        
+        // Display the route that matches the current selection
+        if (routeType === 'fastest') {
+          displayRouteRef.current?.(parsed.routes.fastest, 'fastest');
+        } else if (routeType === 'cell_coverage') {
+          displayRouteRef.current?.(parsed.routes.cell_coverage, 'cell_coverage');
+        } else if (routeType === 'balanced') {
+          displayRouteRef.current?.(parsed.routes.balanced, 'balanced');
+        }
+        
+        // Clear loading state
+        setAllRoutesComputed(true);
+        setRoutesAreLoading(false);
+        setIsLoadingRoute(false);
+        window._routeCalcStartTime = null;
+        console.log("CALCULATE: Completed from cache");
+        return;
+      } catch (err) {
+        console.error("Error parsing cached routes, recalculating", err);
+        localStorage.removeItem(`route_cache_${cacheKey}`);
+      }
+    }
+    
+    try {
+      console.time('routeCalculation');
+      console.log("CALCULATE: Requesting fastest route from backend");
+      
+      // Request fastest route first
+      const fastestRouteResult = await calculateRouteRef.current?.(
+        points.start.lat,
+        points.start.lng,
+        points.end.lat,
+        points.end.lng,
+        'fastest',
+        'osrm',
+        0
+      );
+      
+      if (!fastestRouteResult?.route) {
+        throw new Error('Failed to calculate fastest route');
+      }
+      
+      console.log("CALCULATE: Got fastest route successfully");
+      
+      // Determine if custom routing or OSRM alternatives
+      const isCustomRoutingEnabled = fastestRouteResult.route.custom_route !== undefined;
+      console.log(`CALCULATE: Using ${isCustomRoutingEnabled ? 'custom routing' : 'OSRM alternatives'}`);
+      
+      let fastestRouteData, cellCoverageRouteData, balancedRouteData;
+      let fastestTowers, cellCoverageTowers, balancedTowers;
+      
+      if (isCustomRoutingEnabled) {
+        // CUSTOM ROUTING MODE
+        fastestRouteData = fastestRouteResult.route;
+        fastestTowers = fastestRouteResult.towers;
+        
+        // Update UI with fastest route immediately for responsive feedback
+        setComputedRoutes(prev => ({ ...prev, fastest: fastestRouteData }));
+        setComputedRouteTowers(prev => ({ ...prev, fastest: fastestTowers }));
+        
+        if (routeType === 'fastest') {
+          displayRouteRef.current?.(fastestRouteData, 'fastest');
+        }
+        
+        console.log("CALCULATE: Requesting cell coverage and balanced routes in parallel");
+        
+        // Calculate other route types in parallel
+        const [cellCoverageResult, balancedResult] = await Promise.all([
+          calculateRouteRef.current?.(
+            points.start.lat,
+            points.start.lng,
+            points.end.lat,
+            points.end.lng,
+            'cell_coverage',
+            'custom',
+            0.8
+          ).catch(err => {
+            console.error("Error calculating cell coverage route:", err);
+            return null;
+          }),
+          
+          calculateRouteRef.current?.(
+            points.start.lat,
+            points.start.lng,
+            points.end.lat,
+            points.end.lng,
+            'balanced',
+            'custom',
+            0.5
+          ).catch(err => {
+            console.error("Error calculating balanced route:", err);
+            return null;
+          })
+        ]);
+        
+        // Process cell coverage route if available
+        if (cellCoverageResult?.route) {
+          cellCoverageRouteData = cellCoverageResult.route;
+          cellCoverageTowers = cellCoverageResult.towers;
+          
+          setComputedRoutes(prev => ({ ...prev, cell_coverage: cellCoverageRouteData }));
+          setComputedRouteTowers(prev => ({ ...prev, cell_coverage: cellCoverageTowers }));
+          
+          if (routeType === 'cell_coverage') {
+            displayRouteRef.current?.(cellCoverageRouteData, 'cell_coverage');
+          }
+        } else {
+          // Fallback to fastest if cell coverage calculation failed
+          cellCoverageRouteData = fastestRouteData;
+          cellCoverageTowers = fastestTowers;
+          console.warn("Cell coverage route calculation failed, using fastest route as fallback");
+        }
+        
+        // Process balanced route if available
+        if (balancedResult?.route) {
+          balancedRouteData = balancedResult.route;
+          balancedTowers = balancedResult.towers;
+          
+          setComputedRoutes(prev => ({ ...prev, balanced: balancedRouteData }));
+          setComputedRouteTowers(prev => ({ ...prev, balanced: balancedTowers }));
+          
+          if (routeType === 'balanced') {
+            displayRouteRef.current?.(balancedRouteData, 'balanced');
+          }
+        } else {
+          // Fallback to fastest if balanced calculation failed
+          balancedRouteData = fastestRouteData;
+          balancedTowers = fastestTowers;
+          console.warn("Balanced route calculation failed, using fastest route as fallback");
+        }
+      } else {
+        // OSRM ALTERNATIVES MODE
+        console.log("CALCULATE: Processing OSRM alternatives");
+        
+        const routes = fastestRouteResult.route.routes || [];
+        console.log(`CALCULATE: OSRM returned ${routes.length} alternative routes`);
+        
+        if (routes.length === 0) {
+          throw new Error('No routes returned from OSRM');
+        }
+        
+        // Calculate towers along each alternative route
+        console.log("CALCULATE: Finding towers along each alternative route");
+        const routesWithTowers = await Promise.all(routes.map(async (route, index) => {
+          const geometry = route.geometry || {};
+          const towers = findTowersAlongRouteRef.current?.(allTowers.current, geometry, 1000) || [];
+          const signalScore = calculateSignalScoreRef.current?.(towers);
+          
+          return {
+            route: route,
+            index: index,
+            towers: towers,
+            signalScore: signalScore || 0,
+            distance: route.distance,
+            duration: route.duration,
+            balancedScore: (signalScore || 0) * 0.5 + (1 - (route.duration / (routes[0].duration * 1.5))) * 0.5
+          };
+        }));
+        
+        // Select best routes for each type
+        const fastestRoute = routes[0];
+        fastestTowers = routesWithTowers[0].towers;
+        
+        // Find best cell coverage route
+        const cellCoverageIndex = routesWithTowers.reduce(
+          (maxIndex, route, index) => route.signalScore > routesWithTowers[maxIndex].signalScore ? index : maxIndex,
+          0
+        );
+        const cellCoverageRoute = routes[cellCoverageIndex];
+        cellCoverageTowers = routesWithTowers[cellCoverageIndex].towers;
+        
+        // Find best balanced route
+        const balancedIndex = routesWithTowers.reduce(
+          (maxIndex, route, index) => route.balancedScore > routesWithTowers[maxIndex].balancedScore ? index : maxIndex,
+          0
+        );
+        const balancedRoute = routes[balancedIndex];
+        balancedTowers = routesWithTowers[balancedIndex].towers;
+        
+        console.log(`CALCULATE: Selected routes - Fastest: 0, Cell coverage: ${cellCoverageIndex}, Balanced: ${balancedIndex}`);
+        
+        // Create route data in consistent format
+        const createRouteData = (route, towers) => ({
+          routes: [route],
+          waypoints: fastestRouteResult.route.waypoints,
+          distance: route.distance,
+          duration: route.duration,
+          towers: towers
+        });
+        
+        // Create final route data objects
+        fastestRouteData = createRouteData(fastestRoute, fastestTowers);
+        cellCoverageRouteData = createRouteData(cellCoverageRoute, cellCoverageTowers);
+        balancedRouteData = createRouteData(balancedRoute, balancedTowers);
+        
+        // Update state all at once
+        setComputedRoutes({
+          fastest: fastestRouteData,
+          cell_coverage: cellCoverageRouteData,
+          balanced: balancedRouteData
+        });
+        
+        setComputedRouteTowers({
+          fastest: fastestTowers,
+          cell_coverage: cellCoverageTowers,
+          balanced: balancedTowers
+        });
+        
+        // Display route matching current selection
+        if (routeType === 'fastest') {
+          displayRouteRef.current?.(fastestRouteData, 'fastest');
+        } else if (routeType === 'cell_coverage') {
+          displayRouteRef.current?.(cellCoverageRouteData, 'cell_coverage');
+        } else if (routeType === 'balanced') {
+          displayRouteRef.current?.(balancedRouteData, 'balanced');
+        }
+      }
+      
+      console.timeEnd('routeCalculation');
+      console.log("CALCULATE: All routes calculated successfully");
+      
+      // Create final route data for state updates
+      const finalComputedRoutes = {
+        fastest: fastestRouteData,
+        cell_coverage: cellCoverageRouteData,
+        balanced: balancedRouteData
+      };
+      
+      // Update array of routes
+      const newAllRoutes = [
+        finalComputedRoutes.fastest,
+        finalComputedRoutes.cell_coverage,
+        finalComputedRoutes.balanced
+      ];
+      
+      setAllRoutes(newAllRoutes);
+      
+      // Cache routes for future use
+      try {
+        console.log("CALCULATE: Caching route data");
+        localStorage.setItem(`route_cache_${cacheKey}`, JSON.stringify({
+          routes: finalComputedRoutes,
+          towers: {
+            fastest: fastestTowers,
+            cell_coverage: cellCoverageTowers,
+            balanced: balancedTowers
+          },
+          timestamp: Date.now()
+        }));
+      } catch (cacheError) {
+        console.warn("Could not cache routes due to storage limitation", cacheError);
+      }
+      
+      // Final state updates
+      setAllRoutesComputed(true);
+      setRoutesAreLoading(false);
+      setIsLoadingRoute(false);
+      window._routeCalcStartTime = null;
+      
+      console.log("CALCULATE: Route calculation process complete");
+    } catch (error) {
+      console.error('CALCULATE ERROR:', error);
+      
+      // Reset all states even on error
+      setAllRoutesComputed(true); // Mark as completed
+      setRoutesAreLoading(false);
+      setIsLoadingRoute(false);
+      window._routeCalcStartTime = null;
+      
+      // Show error to user
+      toast.error("Error calculating routes. Please try again.", { position: "top-center" });
+      console.log("CALCULATE: Process terminated with errors");
+    }
+  };
+
+  // Update the reference to point to our wrapper function 
+  calculateAllRouteTypesRef.current = calculateRouteWithPoints;
 
   // Calculate Route Function (Calls Backend)
   const calculateRoute = useCallback(async (startLat, startLng, endLat, endLng, routeType, algorithm = 'osrm', weight = 0) => {
@@ -630,28 +1074,28 @@ function App() {
     const routeCoords = routeGeometry.coordinates; // Expecting GeoJSON [lng, lat] format
     const towersWithDistance = [];
 
+    // Precompute route segments to avoid repeated calculation
+    const routeSegments = [];
+    for (let i = 0; i < routeCoords.length - 1; i++) {
+      routeSegments.push({
+        start: L.latLng(routeCoords[i][1], routeCoords[i][0]),
+        end: L.latLng(routeCoords[i+1][1], routeCoords[i+1][0])
+      });
+    }
+
     // Helper function to calculate distance from point to line segment
     const distanceToSegment = (point, lineStart, lineEnd) => {
       const dx = lineEnd.lng - lineStart.lng;
       const dy = lineEnd.lat - lineStart.lat;
       const len2 = dx * dx + dy * dy;
 
-      if (len2 === 0) {
-        // Line segment is actually a point
-        return point.distanceTo(lineStart);
-      }
+      if (len2 === 0) return point.distanceTo(lineStart);
 
       // Calculate projection of point onto line
       const t = ((point.lng - lineStart.lng) * dx + (point.lat - lineStart.lat) * dy) / len2;
 
-      if (t < 0) {
-        // Point is before line start
-        return point.distanceTo(lineStart);
-      }
-      if (t > 1) {
-        // Point is after line end
-        return point.distanceTo(lineEnd);
-      }
+      if (t < 0) return point.distanceTo(lineStart);
+      if (t > 1) return point.distanceTo(lineEnd);
 
       // Point is on line segment
       const projection = L.latLng(
@@ -661,18 +1105,44 @@ function App() {
       return point.distanceTo(projection);
     };
 
-    towersToFilter.forEach(tower => {
-      if (tower.lat && tower.lon) { // Ensure tower has coordinates
+    // Create a simplified route for faster initial filtering
+    // This reduces the number of detailed distance calculations needed
+    const routeBounds = L.latLngBounds();
+    routeSegments.forEach(segment => {
+      routeBounds.extend(segment.start);
+      routeBounds.extend(segment.end);
+    });
+    
+    // Expand bounds by maxDistance
+    const expandedBounds = L.latLngBounds(
+      L.latLng(routeBounds.getSouth() - maxDistance/111000, routeBounds.getWest() - maxDistance/111000),
+      L.latLng(routeBounds.getNorth() + maxDistance/111000, routeBounds.getEast() + maxDistance/111000)
+    );
+    
+    // First quick filter by bounding box
+    const preFilteredTowers = towersToFilter.filter(tower => {
+      if (!tower.lat || !tower.lon) return false;
+      const towerPoint = L.latLng(tower.lat, tower.lon);
+      return expandedBounds.contains(towerPoint);
+    });
+    
+    console.log(`Quick spatial filter: ${preFilteredTowers.length}/${towersToFilter.length} towers in route bounding box`);
+
+    // Now do more precise distance calculation on smaller set
+    preFilteredTowers.forEach(tower => {
+      if (tower.lat && tower.lon) {
         const towerPoint = L.latLng(tower.lat, tower.lon);
         try {
           let minDistance = Infinity;
 
           // Calculate distance to each line segment
-          for (let i = 0; i < routeCoords.length - 1; i++) {
-            const segmentStart = L.latLng(routeCoords[i][1], routeCoords[i][0]);
-            const segmentEnd = L.latLng(routeCoords[i + 1][1], routeCoords[i + 1][0]);
-            const distance = distanceToSegment(towerPoint, segmentStart, segmentEnd);
-            minDistance = Math.min(minDistance, distance);
+          for (const segment of routeSegments) {
+            const distance = distanceToSegment(towerPoint, segment.start, segment.end);
+            if (distance < minDistance) {
+              minDistance = distance;
+              // Early exit if we found a very close distance
+              if (minDistance <= 100) break;
+            }
           }
 
           if (minDistance <= maxDistance) {
@@ -686,22 +1156,28 @@ function App() {
 
     towersWithDistance.sort((a, b) => a.distanceToRoute - b.distanceToRoute);
 
-    // Optional: Smart filtering if too many towers are found (keep existing logic)
-    if (towersWithDistance.length > 100) { // Increased threshold
+    // Smart filtering for large result sets
+    if (towersWithDistance.length > 100) {
         console.log(`Applying smart filter: ${towersWithDistance.length} towers found.`);
-        const veryClose = towersWithDistance.filter(t => t.distanceToRoute <= 200); // Increased from 100 to 200
-        const midDistance = towersWithDistance.filter(t => t.distanceToRoute > 200 && t.distanceToRoute <= 600); // Adjusted ranges
-        const midStep = Math.max(1, Math.floor(midDistance.length / Math.min(midDistance.length, 30))); // Sample more
+        // Very close towers (always keep these)
+        const veryClose = towersWithDistance.filter(t => t.distanceToRoute <= 200);
+        
+        // Mid-distance towers (keep some proportion)
+        const midDistance = towersWithDistance.filter(t => t.distanceToRoute > 200 && t.distanceToRoute <= 600);
+        const midStep = Math.max(1, Math.floor(midDistance.length / Math.min(midDistance.length, 40)));
         const sampledMid = midDistance.filter((_, i) => i % midStep === 0);
-        const farDistance = towersWithDistance.filter(t => t.distanceToRoute > 600 && t.distanceToRoute <= maxDistance); // Adjusted ranges
-        const farStep = Math.max(1, Math.floor(farDistance.length / Math.min(farDistance.length, 20))); // Sample more
+        
+        // Far towers (keep fewer)
+        const farDistance = towersWithDistance.filter(t => t.distanceToRoute > 600 && t.distanceToRoute <= maxDistance);
+        const farStep = Math.max(1, Math.floor(farDistance.length / Math.min(farDistance.length, 30)));
         const sampledFar = farDistance.filter((_, i) => i % farStep === 0);
+        
         const filteredTowers = [...veryClose, ...sampledMid, ...sampledFar];
         
         if (filteredTowers.length < 20 && towersWithDistance.length >= 20) {
-            console.log("Smart filter result too small, returning top 100 closest.");
             return towersWithDistance.slice(0, 100);
         }
+        
         console.log(`Smart filter applied, ${filteredTowers.length} towers selected.`);
         return filteredTowers;
     }
@@ -808,56 +1284,141 @@ function App() {
       // Only display if toggled on
       if (!showCellTowers) {
           setRouteTowers([]); // Clear route-specific towers when hidden
-            return;
-          }
+          return;
+      }
           
+      // Use a layerGroup for better performance
       const towerLayer = L.layerGroup();
       let towersToDisplay = [];
       const currentRouteLayer = routeControlRef.current;
-      const currentRouteGeometry = currentRouteLayer
-          ? { type: "LineString", coordinates: currentRouteLayer.getLatLngs().map(ll => [ll.lng, ll.lat]) }
-          : null;
+      
+      // Create geometry only if we have a route
+      const currentRouteGeometry = currentRouteLayer ? {
+          type: "LineString", 
+          coordinates: currentRouteLayer.getLatLngs().map(ll => [ll.lng, ll.lat])
+      } : null;
+
+      // Limit the number of towers to display for performance
+      const MAX_DISPLAY_TOWERS = 500;
 
       if (currentRouteLayer && currentRouteGeometry) {
-          // --- Requirement 3: Display Towers Along Route ---
+          // --- Display Towers Along Route ---
           console.log("Displaying towers along the current route...");
-          towersToDisplay = findTowersAlongRouteRef.current?.(allTowers.current, currentRouteGeometry, 500) || [];
-          setRouteTowers(towersToDisplay); // Update state for route-specific towers
-
-          // Update routeInfo with signal score based on these towers
+          
+          // Check if we already have route-specific towers cached
+          let routeSpecificTowers = routeTowers;
+          
+          // If no cached route towers or empty, recalculate
+          if (!routeSpecificTowers || routeSpecificTowers.length === 0) {
+              routeSpecificTowers = findTowersAlongRouteRef.current?.(allTowers.current, currentRouteGeometry, 500) || [];
+              setRouteTowers(routeSpecificTowers); // Cache for future use
+          }
+          
+          towersToDisplay = routeSpecificTowers;
+          
+          // Update routeInfo with signal score
           const signalQuality = calculateSignalScoreRef.current?.(towersToDisplay) || 0;
-          setRouteInfo(prev => prev ? { ...prev, signalQuality: signalQuality, towerCount: towersToDisplay.length } : null);
-
-    } else {
+          setRouteInfo(prev => prev ? { 
+              ...prev, 
+              signalQuality: signalQuality, 
+              towerCount: towersToDisplay.length 
+          } : null);
+      } else {
           // --- Initial Display (Before Route) or No Route ---
           console.log("Displaying all fetched towers (no route active)...");
           towersToDisplay = allTowers.current || [];
           setRouteTowers([]); // No route-specific towers
+          
           // Clear route-specific info
-           setRouteInfo(prev => prev ? { ...prev, signalQuality: undefined, towerCount: undefined } : null);
+          setRouteInfo(prev => prev ? { 
+              ...prev, 
+              signalQuality: undefined, 
+              towerCount: undefined 
+          } : null);
       }
 
-      console.log(`Adding ${towersToDisplay.length} towers to the map.`);
-      towersToDisplay.forEach(tower => {
-      const signalStrength = tower.averageSignal || -100;
-      let signalClass = 'weak';
-      if (signalStrength > -70) signalClass = 'strong';
-      else if (signalStrength > -90) signalClass = 'medium';
+      // Limit number of towers displayed for performance
+      let displayLimit = Math.min(towersToDisplay.length, MAX_DISPLAY_TOWERS);
+      
+      if (towersToDisplay.length > MAX_DISPLAY_TOWERS) {
+          console.log(`Limiting tower display to ${MAX_DISPLAY_TOWERS} out of ${towersToDisplay.length} total towers`);
+          // For large sets, prioritize by signal strength and distance to route
+          towersToDisplay.sort((a, b) => {
+              // If along route, prioritize by distance to route first
+              if (a.distanceToRoute && b.distanceToRoute) {
+                  return a.distanceToRoute - b.distanceToRoute;
+              }
+              // Otherwise by signal strength (stronger first)
+              return (b.averageSignal || -100) - (a.averageSignal || -100);
+          });
+          
+          towersToDisplay = towersToDisplay.slice(0, MAX_DISPLAY_TOWERS);
+      }
 
-          const isAlongRoute = !!currentRouteLayer; // Mark if they are along a route
-          const iconHtml = `<div class="cell-tower-marker ${signalClass} ${isAlongRoute ? 'along-route' : ''}"></div>`;
-          const icon = L.divIcon({ html: iconHtml, className: '', iconSize: [12, 12], iconAnchor: [6, 6] });
+      // Use a more efficient tower rendering approach - batch creation
+      console.log(`Rendering ${towersToDisplay.length} towers on the map`);
+      
+      // Create markers in batches for better performance
+      const BATCH_SIZE = 50;
+      const processBatch = (startIdx) => {
+          const endIdx = Math.min(startIdx + BATCH_SIZE, towersToDisplay.length);
+          
+          for (let i = startIdx; i < endIdx; i++) {
+              const tower = towersToDisplay[i];
+              if (!tower.lat || !tower.lon) continue;
+              
+              // Calculate signal class
+              const signalStrength = tower.averageSignal || -100;
+              let signalClass = 'weak';
+              if (signalStrength > -70) signalClass = 'strong';
+              else if (signalStrength > -90) signalClass = 'medium';
 
-          if (tower.lat && tower.lon) {
-      const marker = L.marker([tower.lat, tower.lon], { icon });
-      towerLayer.addLayer(marker);
+              const isAlongRoute = !!currentRouteLayer && tower.distanceToRoute !== undefined;
+              const iconHtml = `<div class="cell-tower-marker ${signalClass} ${isAlongRoute ? 'along-route' : ''}"></div>`;
+              const icon = L.divIcon({ 
+                  html: iconHtml, 
+                  className: '', 
+                  iconSize: [12, 12], 
+                  iconAnchor: [6, 6] 
+              });
+
+              const marker = L.marker([tower.lat, tower.lon], { icon });
+              
+              // Add popup with tower info for better user experience
+              marker.bindPopup(`
+                  <div class="tower-popup">
+                      <div class="tower-popup-header">
+                          <strong>${tower.radio || 'Unknown'} Tower</strong>
+                          <span class="signal-badge ${signalClass}">${tower.averageSignal || 'Unknown'} dBm</span>
+                      </div>
+                      <div class="tower-popup-content">
+                          <div><strong>Network:</strong> MCC ${tower.mcc || '?'} / MNC ${tower.net || '?'}</div>
+                          <div><strong>Cell:</strong> ${tower.area || '?'}-${tower.cell || '?'}</div>
+                          <div><strong>Range:</strong> ${tower.range ? (tower.range + 'm') : 'Unknown'}</div>
+                          ${tower.samples ? `<div><strong>Samples:</strong> ${tower.samples}</div>` : ''}
+                          ${tower.distanceToRoute ? `<div><strong>Distance to route:</strong> ${Math.round(tower.distanceToRoute)}m</div>` : ''}
+                          <div><strong>Last updated:</strong> ${tower.updated ? formatDateRef.current(new Date(tower.updated * 1000).toISOString()) : 'Unknown'}</div>
+                      </div>
+                  </div>
+              `);
+              
+              towerLayer.addLayer(marker);
           }
-    });
+          
+          // Process next batch if needed
+          if (endIdx < towersToDisplay.length) {
+              setTimeout(() => processBatch(endIdx), 0);
+          }
+      };
+      
+      // Start processing the first batch
+      processBatch(0);
+      
+      // Add the layer to the map
+      towerLayer.addTo(map);
+      cellTowerLayerRef.current = towerLayer;
 
-    towerLayer.addTo(map);
-    cellTowerLayerRef.current = towerLayer;
-
-  }, [map, showCellTowers, allTowers, routeControlRef]); // Dependencies
+  }, [map, showCellTowers, routeTowers, routeControlRef.current]); // Add explicit dependencies
   displayTowersRef.current = displayTowers;
 
   // Effect to trigger tower display when relevant state changes
@@ -922,14 +1483,70 @@ function App() {
 
   // Calculate All Route Types Function
   const calculateAllRouteTypes = async () => {
-    if (!hasValidRoutePoints()) return;
+    console.log("CALCULATE: Starting route calculation with:", currentRoutePoints);
     
+    // Critical validation - ensure we have valid route points
+    if (!currentRoutePoints?.start?.lat || !currentRoutePoints?.start?.lng || 
+        !currentRoutePoints?.end?.lat || !currentRoutePoints?.end?.lng) {
+      console.error("CALCULATE: Cannot calculate routes - missing route points");
+      setRoutesAreLoading(false);
+      setIsLoadingRoute(false);
+      window._routeCalcStartTime = null;
+      return;
+    }
+    
+    // Note: We're intentionally NOT checking routesAreLoading here to avoid getting stuck
+    console.log("CALCULATE: Proceeding with route calculation regardless of previous state");
+    
+    // Ensure we have a calculation start time
+    if (!window._routeCalcStartTime) {
+      window._routeCalcStartTime = Date.now();
+    }
+    
+    // Set loading flags - regardless of previous state
+    setRoutesAreLoading(true);
+    setIsLoadingRoute(true);
     setAllRoutesComputed(false);
-    setComputedRoutes({ fastest: null, cell_coverage: null, balanced: null });
-    setComputedRouteTowers(prev => ({ ...prev, fastest: null, cell_coverage: null, balanced: null }));
+    
+    // Check for cached routes
+    const cacheKey = `${currentRoutePoints.start.lat},${currentRoutePoints.start.lng}|${currentRoutePoints.end.lat},${currentRoutePoints.end.lng}`;
+    const cachedResult = localStorage.getItem(`route_cache_${cacheKey}`);
+    
+    if (cachedResult) {
+      try {
+        const parsed = JSON.parse(cachedResult);
+        console.log("CALCULATE: Using cached route data");
+        setComputedRoutes(parsed.routes);
+        setComputedRouteTowers(parsed.towers);
+        setAllRoutes([parsed.routes.fastest, parsed.routes.cell_coverage, parsed.routes.balanced]);
+        
+        // Display the route that matches the current selection
+        if (routeType === 'fastest') {
+          displayRouteRef.current?.(parsed.routes.fastest, 'fastest');
+        } else if (routeType === 'cell_coverage') {
+          displayRouteRef.current?.(parsed.routes.cell_coverage, 'cell_coverage');
+        } else if (routeType === 'balanced') {
+          displayRouteRef.current?.(parsed.routes.balanced, 'balanced');
+        }
+        
+        // Clear loading state
+        setAllRoutesComputed(true);
+        setRoutesAreLoading(false);
+        setIsLoadingRoute(false);
+        window._routeCalcStartTime = null;
+        console.log("CALCULATE: Completed from cache");
+        return;
+      } catch (err) {
+        console.error("Error parsing cached routes, recalculating", err);
+        localStorage.removeItem(`route_cache_${cacheKey}`);
+      }
+    }
     
     try {
-      // First get the fastest route to use as fallback
+      console.time('routeCalculation');
+      console.log("CALCULATE: Requesting fastest route from backend");
+      
+      // Request fastest route first
       const fastestRouteResult = await calculateRouteRef.current?.(
         currentRoutePoints.start.lat,
         currentRoutePoints.start.lng,
@@ -944,74 +1561,107 @@ function App() {
         throw new Error('Failed to calculate fastest route');
       }
       
-      // Check if custom routing is enabled
+      console.log("CALCULATE: Got fastest route successfully");
+      
+      // Determine if custom routing or OSRM alternatives
       const isCustomRoutingEnabled = fastestRouteResult.route.custom_route !== undefined;
+      console.log(`CALCULATE: Using ${isCustomRoutingEnabled ? 'custom routing' : 'OSRM alternatives'}`);
+      
+      let fastestRouteData, cellCoverageRouteData, balancedRouteData;
+      let fastestTowers, cellCoverageTowers, balancedTowers;
       
       if (isCustomRoutingEnabled) {
-        // CASE 1: Custom routing is enabled - use separate API calls for each type
-        console.log("Custom routing enabled, calculating specialized routes");
+        // CUSTOM ROUTING MODE
+        fastestRouteData = fastestRouteResult.route;
+        fastestTowers = fastestRouteResult.towers;
         
-        // Update fastest route immediately
-        setComputedRoutes(prev => ({ ...prev, fastest: fastestRouteResult.route }));
-        setComputedRouteTowers(prev => ({ ...prev, fastest: fastestRouteResult.towers }));
+        // Update UI with fastest route immediately for responsive feedback
+        setComputedRoutes(prev => ({ ...prev, fastest: fastestRouteData }));
+        setComputedRouteTowers(prev => ({ ...prev, fastest: fastestTowers }));
         
-        // If this is the current selection, display it
         if (routeType === 'fastest') {
-          displayRoute(fastestRouteResult.route, 'fastest');
+          displayRouteRef.current?.(fastestRouteData, 'fastest');
         }
         
-        // Calculate cell coverage route
-        const cellCoverageResult = await calculateRouteRef.current?.(
-          currentRoutePoints.start.lat,
-          currentRoutePoints.start.lng,
-          currentRoutePoints.end.lat,
-          currentRoutePoints.end.lng,
-          'cell_coverage',
-          'custom',
-          0.8
-        );
+        console.log("CALCULATE: Requesting cell coverage and balanced routes in parallel");
         
+        // Calculate other route types in parallel
+        const [cellCoverageResult, balancedResult] = await Promise.all([
+          calculateRouteRef.current?.(
+            currentRoutePoints.start.lat,
+            currentRoutePoints.start.lng,
+            currentRoutePoints.end.lat,
+            currentRoutePoints.end.lng,
+            'cell_coverage',
+            'custom',
+            0.8
+          ).catch(err => {
+            console.error("Error calculating cell coverage route:", err);
+            return null;
+          }),
+          
+          calculateRouteRef.current?.(
+            currentRoutePoints.start.lat,
+            currentRoutePoints.start.lng,
+            currentRoutePoints.end.lat,
+            currentRoutePoints.end.lng,
+            'balanced',
+            'custom',
+            0.5
+          ).catch(err => {
+            console.error("Error calculating balanced route:", err);
+            return null;
+          })
+        ]);
+        
+        // Process cell coverage route if available
         if (cellCoverageResult?.route) {
-          setComputedRoutes(prev => ({ ...prev, cell_coverage: cellCoverageResult.route }));
-          setComputedRouteTowers(prev => ({ ...prev, cell_coverage: cellCoverageResult.towers }));
+          cellCoverageRouteData = cellCoverageResult.route;
+          cellCoverageTowers = cellCoverageResult.towers;
+          
+          setComputedRoutes(prev => ({ ...prev, cell_coverage: cellCoverageRouteData }));
+          setComputedRouteTowers(prev => ({ ...prev, cell_coverage: cellCoverageTowers }));
           
           if (routeType === 'cell_coverage') {
-            displayRoute(cellCoverageResult.route, 'cell_coverage');
+            displayRouteRef.current?.(cellCoverageRouteData, 'cell_coverage');
           }
+        } else {
+          // Fallback to fastest if cell coverage calculation failed
+          cellCoverageRouteData = fastestRouteData;
+          cellCoverageTowers = fastestTowers;
+          console.warn("Cell coverage route calculation failed, using fastest route as fallback");
         }
         
-        // Calculate balanced route
-        const balancedResult = await calculateRouteRef.current?.(
-          currentRoutePoints.start.lat,
-          currentRoutePoints.start.lng,
-          currentRoutePoints.end.lat,
-          currentRoutePoints.end.lng,
-          'balanced',
-          'custom',
-          0.5
-        );
-        
+        // Process balanced route if available
         if (balancedResult?.route) {
-          setComputedRoutes(prev => ({ ...prev, balanced: balancedResult.route }));
-          setComputedRouteTowers(prev => ({ ...prev, balanced: balancedResult.towers }));
+          balancedRouteData = balancedResult.route;
+          balancedTowers = balancedResult.towers;
+          
+          setComputedRoutes(prev => ({ ...prev, balanced: balancedRouteData }));
+          setComputedRouteTowers(prev => ({ ...prev, balanced: balancedTowers }));
           
           if (routeType === 'balanced') {
-            displayRoute(balancedResult.route, 'balanced');
+            displayRouteRef.current?.(balancedRouteData, 'balanced');
           }
+        } else {
+          // Fallback to fastest if balanced calculation failed
+          balancedRouteData = fastestRouteData;
+          balancedTowers = fastestTowers;
+          console.warn("Balanced route calculation failed, using fastest route as fallback");
         }
       } else {
-        // CASE 2: Custom routing is disabled - use a single OSRM call with alternatives
-        console.log("Custom routing disabled, using OSRM alternatives and cell data to select optimal routes");
+        // OSRM ALTERNATIVES MODE
+        console.log("CALCULATE: Processing OSRM alternatives");
         
-        // The OSRM route already has alternatives (should be in fastestRouteResult.route.routes)
         const routes = fastestRouteResult.route.routes || [];
-        console.log(`OSRM returned ${routes.length} alternative routes`);
+        console.log(`CALCULATE: OSRM returned ${routes.length} alternative routes`);
         
         if (routes.length === 0) {
           throw new Error('No routes returned from OSRM');
         }
         
-        // Find towers along each alternative route
+        // Calculate towers along each alternative route
+        console.log("CALCULATE: Finding towers along each alternative route");
         const routesWithTowers = await Promise.all(routes.map(async (route, index) => {
           const geometry = route.geometry || {};
           const towers = findTowersAlongRouteRef.current?.(allTowers.current, geometry, 1000) || [];
@@ -1024,43 +1674,33 @@ function App() {
             signalScore: signalScore || 0,
             distance: route.distance,
             duration: route.duration,
-            // Calculate a balanced score (normalized)
             balancedScore: (signalScore || 0) * 0.5 + (1 - (route.duration / (routes[0].duration * 1.5))) * 0.5
           };
         }));
         
-        console.log("Routes with analysis:", routesWithTowers.map(r => ({
-          index: r.index,
-          duration: r.duration,
-          towers: r.towers.length,
-          signalScore: r.signalScore,
-          balancedScore: r.balancedScore
-        })));
-        
-        // Select the best route for each type
-        // For fastest, use the first route (OSRM already sorts by fastest)
+        // Select best routes for each type
         const fastestRoute = routes[0];
-        const fastestTowers = routesWithTowers[0].towers;
+        fastestTowers = routesWithTowers[0].towers;
         
-        // For cell coverage, select the route with the highest signal score
+        // Find best cell coverage route
         const cellCoverageIndex = routesWithTowers.reduce(
-          (maxIndex, route, index) => route.signalScore > routesWithTowers[maxIndex].signalScore ? index : maxIndex, 
+          (maxIndex, route, index) => route.signalScore > routesWithTowers[maxIndex].signalScore ? index : maxIndex,
           0
         );
         const cellCoverageRoute = routes[cellCoverageIndex];
-        const cellCoverageTowers = routesWithTowers[cellCoverageIndex].towers;
+        cellCoverageTowers = routesWithTowers[cellCoverageIndex].towers;
         
-        // For balanced, select the route with the highest balanced score
+        // Find best balanced route
         const balancedIndex = routesWithTowers.reduce(
-          (maxIndex, route, index) => route.balancedScore > routesWithTowers[maxIndex].balancedScore ? index : maxIndex, 
+          (maxIndex, route, index) => route.balancedScore > routesWithTowers[maxIndex].balancedScore ? index : maxIndex,
           0
         );
         const balancedRoute = routes[balancedIndex];
-        const balancedTowers = routesWithTowers[balancedIndex].towers;
+        balancedTowers = routesWithTowers[balancedIndex].towers;
         
-        console.log(`Selected routes - Fastest: 0, Cell coverage: ${cellCoverageIndex}, Balanced: ${balancedIndex}`);
+        console.log(`CALCULATE: Selected routes - Fastest: 0, Cell coverage: ${cellCoverageIndex}, Balanced: ${balancedIndex}`);
         
-        // Create route data in the same format as expected from the API
+        // Create route data in consistent format
         const createRouteData = (route, towers) => ({
           routes: [route],
           waypoints: fastestRouteResult.route.waypoints,
@@ -1069,11 +1709,12 @@ function App() {
           towers: towers
         });
         
-        // Update state with our selected routes
-        const fastestRouteData = createRouteData(fastestRoute, fastestTowers);
-        const cellCoverageRouteData = createRouteData(cellCoverageRoute, cellCoverageTowers);
-        const balancedRouteData = createRouteData(balancedRoute, balancedTowers);
+        // Create final route data objects
+        fastestRouteData = createRouteData(fastestRoute, fastestTowers);
+        cellCoverageRouteData = createRouteData(cellCoverageRoute, cellCoverageTowers);
+        balancedRouteData = createRouteData(balancedRoute, balancedTowers);
         
+        // Update state all at once
         setComputedRoutes({
           fastest: fastestRouteData,
           cell_coverage: cellCoverageRouteData,
@@ -1086,36 +1727,70 @@ function App() {
           balanced: balancedTowers
         });
         
-        // Display the route that matches the current selection
+        // Display route matching current selection
         if (routeType === 'fastest') {
-          displayRoute(fastestRouteData, 'fastest');
+          displayRouteRef.current?.(fastestRouteData, 'fastest');
         } else if (routeType === 'cell_coverage') {
-          displayRoute(cellCoverageRouteData, 'cell_coverage');
+          displayRouteRef.current?.(cellCoverageRouteData, 'cell_coverage');
         } else if (routeType === 'balanced') {
-          displayRoute(balancedRouteData, 'balanced');
+          displayRouteRef.current?.(balancedRouteData, 'balanced');
         }
       }
       
-      // Update allRoutes array at the end
-      setAllRoutes(prev => {
-        const newRoutes = [...prev];
-        newRoutes[0] = computedRoutes.fastest;
-        newRoutes[1] = computedRoutes.cell_coverage;
-        newRoutes[2] = computedRoutes.balanced;
-        return newRoutes;
-      });
+      console.timeEnd('routeCalculation');
+      console.log("CALCULATE: All routes calculated successfully");
       
+      // Create final route data for state updates
+      const finalComputedRoutes = {
+        fastest: fastestRouteData,
+        cell_coverage: cellCoverageRouteData,
+        balanced: balancedRouteData
+      };
+      
+      // Update array of routes
+      const newAllRoutes = [
+        finalComputedRoutes.fastest,
+        finalComputedRoutes.cell_coverage,
+        finalComputedRoutes.balanced
+      ];
+      
+      setAllRoutes(newAllRoutes);
+      
+      // Cache routes for future use
+      try {
+        console.log("CALCULATE: Caching route data");
+        localStorage.setItem(`route_cache_${cacheKey}`, JSON.stringify({
+          routes: finalComputedRoutes,
+          towers: {
+            fastest: fastestTowers,
+            cell_coverage: cellCoverageTowers,
+            balanced: balancedTowers
+          },
+          timestamp: Date.now()
+        }));
+      } catch (cacheError) {
+        console.warn("Could not cache routes due to storage limitation", cacheError);
+      }
+      
+      // Final state updates
       setAllRoutesComputed(true);
+      setRoutesAreLoading(false);
+      setIsLoadingRoute(false);
+      window._routeCalcStartTime = null;
       
-      // Cache the current state
-      setRouteCache({
-        routes: computedRoutes,
-        towers: computedRouteTowers
-      });
-      
+      console.log("CALCULATE: Route calculation process complete");
     } catch (error) {
-      console.error('Error calculating routes:', error);
-      setAllRoutesComputed(true);
+      console.error('CALCULATE ERROR:', error);
+      
+      // Reset all states even on error
+      setAllRoutesComputed(true); // Mark as completed
+      setRoutesAreLoading(false);
+      setIsLoadingRoute(false);
+      window._routeCalcStartTime = null;
+      
+      // Show error to user
+      toast.error("Error calculating routes. Please try again.", { position: "top-center" });
+      console.log("CALCULATE: Process terminated with errors");
     }
   };
   calculateAllRouteTypesRef.current = calculateAllRouteTypes;
@@ -1223,7 +1898,59 @@ function App() {
     const routesStillLoading = routesAreLoading || !allRoutesComputed;
     
     const handleRouteTypeSelect = (selectedType) => {
-      // This function assumes the button was clickable, meaning the route data exists
+      // If routes are still loading or calculation incomplete
+      if (routesAreLoading || !allRoutesComputed) {
+        console.log(`Selected ${selectedType} route, but calculation still in progress. Selection saved.`);
+        setRouteType(selectedType);
+        
+        // If skip selection is enabled, save preference
+        if (skipRouteTypeSelection) {
+          localStorage.setItem('preferredRouteType', selectedType);
+        }
+        
+        // Hide the selection UI
+        setShowRouteTypeSelection(false);
+        
+        // If we have valid route points, force a recalculation with the new route type
+        if (currentRoutePoints?.start?.lat && currentRoutePoints?.start?.lng && 
+            currentRoutePoints?.end?.lat && currentRoutePoints?.end?.lng) {
+          
+          // Make a local copy to avoid state race conditions
+          const pointsToUse = {
+            start: { ...currentRoutePoints.start },
+            end: { ...currentRoutePoints.end }
+          };
+          
+          // Wait a moment for state updates to complete
+          setTimeout(() => {
+            console.log(`Forcing calculation with selected type: ${selectedType}`);
+            // Reset loading state if already calculating
+            if (routesAreLoading) {
+              setRoutesAreLoading(false);
+              setIsLoadingRoute(false);
+              window._routeCalcStartTime = null;
+              
+              // Short delay to ensure reset completes
+              setTimeout(() => {
+                setIsLoadingRoute(true);
+                setRoutesAreLoading(true);
+                window._routeCalcStartTime = Date.now();
+                calculateRouteWithPoints(pointsToUse);
+              }, 50);
+            } else {
+              // If not already calculating, start fresh
+              setIsLoadingRoute(true);
+              setRoutesAreLoading(true);
+              window._routeCalcStartTime = Date.now();
+              calculateRouteWithPoints(pointsToUse);
+            }
+          }, 100);
+        }
+        
+        return;
+      }
+
+      // If we get here, we have completed route data
       const selectedRouteData = computedRoutes[selectedType];
 
       if (!selectedRouteData) {
@@ -1381,14 +2108,35 @@ function App() {
             className={`map-control-button route-type-button ${!hasValidRoutePointsRef.current?.() ? 'disabled' : ''}`}
             onClick={() => {
               if (!hasValidRoutePointsRef.current?.()) {
-                toast.info("Set origin and destination first", { position: "top-center" }); return;
+                toast.info("Set origin and destination first", { position: "top-center" }); 
+                return;
               }
-              setShowRouteTypeSelection(true); // Always show selection when button is clicked
+              
+              // Always show selection when button is clicked
+              setShowRouteTypeSelection(true);
+              
               // Trigger background calculation if needed
-                if (!allRoutesComputed && !routesAreLoading) {
-                    console.log("Triggering background calculation on type button click.");
-                setIsLoadingRoute(true); setRoutesAreLoading(true);
-                calculateAllRouteTypesRef.current?.();
+              if (!allRoutesComputed && !routesAreLoading) {
+                console.log("Triggering background calculation on type button click.");
+                
+                // Make a local copy of points to avoid race conditions
+                if (currentRoutePoints?.start?.lat && currentRoutePoints?.start?.lng && 
+                    currentRoutePoints?.end?.lat && currentRoutePoints?.end?.lng) {
+                  
+                  const pointsToUse = {
+                    start: { ...currentRoutePoints.start },
+                    end: { ...currentRoutePoints.end }
+                  };
+                  
+                  setIsLoadingRoute(true);
+                  setRoutesAreLoading(true);
+                  window._routeCalcStartTime = Date.now();
+                  
+                  // Use setTimeout to ensure state updates
+                  setTimeout(() => {
+                    calculateRouteWithPoints(pointsToUse);
+                  }, 50);
+                }
               }
             }}
             title="Route Optimization Options"
@@ -1515,11 +2263,13 @@ function App() {
                {/* Origin Input */}
                <div className="search-form"><div className="input-group"><div className="input-container">
                  <input ref={originInputRef} type="text" placeholder="Origin" value={originValue} onChange={(e) => handleInputChangeRef.current?.(e, true)} onFocus={() => handleInputFocusRef.current?.(true)} onBlur={() => handleInputBlurRef.current?.(true)} />
+                 {originValue && <button className="clear-input" onClick={() => handleClearInputRef.current?.(true)}>×</button>}
                  {showOriginSuggestions && originSuggestions.length > 0 && <div className="suggestions-dropdown origin-suggestions">{originSuggestions.map((s, i) => <div key={i} className="suggestion-item" onClick={() => handleSuggestionSelectRef.current?.(s, true)} onMouseDown={e => e.preventDefault()}>{s.place_name}</div>)}</div>}
                </div></div></div>
                {/* Destination Input */}
                <div className="search-form"><div className="input-group"><div className="input-container">
                  <input type="text" placeholder="Destination" value={destinationValue} onChange={(e) => handleInputChangeRef.current?.(e, false)} onFocus={() => handleInputFocusRef.current?.(false)} onBlur={() => handleInputBlurRef.current?.(false)} />
+                 {destinationValue && <button className="clear-input" onClick={() => handleClearInputRef.current?.(false)}>×</button>}
                  {showDestinationSuggestions && destinationSuggestions.length > 0 && <div className="suggestions-dropdown destination-suggestions">{destinationSuggestions.map((s, i) => <div key={i} className="suggestion-item" onClick={() => handleSuggestionSelectRef.current?.(s, false)} onMouseDown={e => e.preventDefault()}>{s.place_name}</div>)}</div>}
                </div></div></div>
 
@@ -1533,32 +2283,57 @@ function App() {
                 <div className="tower-count">{allTowers.current.length > 0 ? `${allTowers.current.length} cell towers available` : 'No cell towers found'}</div>
               </div>
               
-              {/* Route Info Display */}
-              {routeInfo && (
-                <div className="route-info">
-                  {/* Display logic based on routeInfo state */}
-                   {routeInfo.routeType === 'fastest' && <div className="route-detail"><span className="route-icon">🚀</span><span>Fastest Route</span></div>}
-                   {(routeInfo.routeType === 'cell_coverage' || routeInfo.routeType === 'balanced') && routeInfo.signalQuality !== undefined && (
-                  <div className="route-detail">
-                       <span className="route-icon">📱</span>
-                       <span className="signal-strength">{Array(5).fill().map((_, i) => <span key={i} className={`signal-bar ${i < Math.round(routeInfo.signalQuality) ? 'active' : ''}`} />)}</span>
-                       <span>({routeInfo.towerCount} towers)</span>
-                  </div>
-                  )}
-                   {/* Display Distance/Duration */}
-                    <div className="route-detail">
-                       <span className="route-icon">📏</span>
-                       <span>{formatDistanceRef.current?.(routeInfo.distance)}</span>
-                    </div>
-                    <div className="route-detail">
-                       <span className="route-icon">⏱️</span>
-                       <span>{formatDurationRef.current?.(routeInfo.duration)}</span>
-                   </div>
-                </div>
-              )}
+              {/* Remove Route Info Display - as requested */}
               
               {/* Loading Indicator */}
-              {(isLoadingRoute || calculationAnimation) && <div className="loading-indicator">{calculationAnimation || 'Calculating route...'}</div>}
+              {(isLoadingRoute || calculationAnimation) && (
+                <div className="loading-indicator">
+                  {calculationAnimation || 'Calculating route...'}
+                  
+                  {/* Add recalculation button if loading for more than 5 seconds */}
+                  {window._routeCalcStartTime && (Date.now() - window._routeCalcStartTime > 5000) && (
+                    <button 
+                      className="recalculate-button"
+                      onClick={() => {
+                        // Reset calculation state completely
+                        console.log("MANUAL RECALCULATION triggered by user");
+                        window._routeCalcStartTime = null;
+                        setRoutesAreLoading(false);
+                        setIsLoadingRoute(false);
+                        setAllRoutesComputed(false);
+                        
+                        // Ensure we have valid route points
+                        if (currentRoutePoints?.start?.lat && currentRoutePoints?.start?.lng && 
+                            currentRoutePoints?.end?.lat && currentRoutePoints?.end?.lng) {
+                          
+                          // Store points locally to avoid race conditions
+                          const pointsToUse = {
+                            start: { ...currentRoutePoints.start },
+                            end: { ...currentRoutePoints.end }
+                          };
+                          
+                          // Force recalculation with delay to ensure state updates
+                          toast.info("Manually recalculating routes...", { position: "top-center" });
+                          
+                          setTimeout(() => {
+                            // Set loading state and start calculation
+                            setIsLoadingRoute(true);
+                            setRoutesAreLoading(true);
+                            window._routeCalcStartTime = Date.now();
+                            
+                            // Call calculation function directly with copied points
+                            calculateRouteWithPoints(pointsToUse);
+                          }, 100);
+                        } else {
+                          toast.error("Cannot recalculate - route points missing", { position: "top-center" });
+                        }
+                      }}
+                    >
+                      Recalculate
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         )}

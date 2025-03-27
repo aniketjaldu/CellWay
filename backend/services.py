@@ -6,11 +6,10 @@ import random
 import os
 import json
 from dotenv import load_dotenv
-import pandas as pd  # Add pandas import for CSV handling
+import pandas as pd
 import heapq
 import polyline
 from shapely.geometry import LineString, Point
-# Add a new import for osmnx
 import osmnx as ox
 import networkx as nx
 import time
