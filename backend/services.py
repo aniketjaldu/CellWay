@@ -927,6 +927,19 @@ def get_route_balanced(start_lat, start_lng, end_lat, end_lng):
 def get_route_fastest(start_lat, start_lng, end_lat, end_lng):
     """Calculate the fastest route between two points using OSRM"""
     try:
+        # Calculate the distance to determine appropriate timeout
+        distance_km = haversine_distance(start_lat, start_lng, end_lat, end_lng) / 1000
+        
+        # Adjust timeout based on distance
+        if distance_km > 100:  # For very long routes
+            timeout = 30
+        elif distance_km > 50:  # For medium-long routes
+            timeout = 20
+        else:  # For shorter routes
+            timeout = 15
+            
+        print(f"Calculating route of {distance_km:.1f}km with {timeout}s timeout")
+        
         url = f"http://router.project-osrm.org/route/v1/driving/{start_lng},{start_lat};{end_lng},{end_lat}"
         params = {
             'overview': 'full',
@@ -935,16 +948,34 @@ def get_route_fastest(start_lat, start_lng, end_lat, end_lng):
             'alternatives': 'true'  # Request alternative routes
         }
         
-        response = requests.get(url, params=params, timeout=10)
-        response.raise_for_status()  # Raise an exception for bad responses
+        # Add retry logic for long routes
+        max_retries = 3
+        current_retry = 0
         
-        return response.json()
-    except requests.exceptions.RequestException as e:
-        print(f"OSRM API request failed: {e}")
-        return {
-            'code': 'Error',
-            'message': f'OSRM route calculation failed: {str(e)}'
-        }
+        while current_retry < max_retries:
+            try:
+                response = requests.get(url, params=params, timeout=timeout)
+                response.raise_for_status()  # Raise an exception for bad responses
+                return response.json()
+            except requests.exceptions.Timeout:
+                current_retry += 1
+                if current_retry < max_retries:
+                    print(f"Timeout on attempt {current_retry}, retrying with increased timeout...")
+                    timeout += 10  # Increase timeout for next attempt
+                    time.sleep(1)  # Wait a bit before retrying
+                else:
+                    print("All retry attempts failed")
+                    return {
+                        'code': 'Error',
+                        'message': 'Route calculation timed out after multiple attempts'
+                    }
+            except requests.exceptions.RequestException as e:
+                print(f"OSRM API request failed: {e}")
+                return {
+                    'code': 'Error',
+                    'message': f'OSRM route calculation failed: {str(e)}'
+                }
+                
     except ValueError as e:
         print(f"Error parsing OSRM response: {e}")
         return {

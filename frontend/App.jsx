@@ -314,16 +314,9 @@ function App() {
       });
     }
     
-    // Initialize allTowers if needed
-    if (!allTowers || !allTowers.current) {
-      console.log("Initializing allTowers in map useEffect");
-      if (!allTowers) {
-        // This shouldn't happen, but let's handle it anyway
-        console.warn("allTowers ref is undefined - creating it");
-        allTowers = { current: [] };
-      } else {
-        allTowers.current = [];
-      }
+    // Initialize allTowers ref if needed
+    if (!allTowers.current) {
+      allTowers.current = [];
     }
     
     // Force map to invalidate its size after mounting
@@ -741,318 +734,166 @@ function App() {
     return score;
   };
 
-  // Find cell towers along a route within specified distance
-  const findTowersAlongRoute = (towers, routeCoordinates, distanceInMeters = 500) => {
-    if (!towers || !routeCoordinates || towers.length === 0 || routeCoordinates.length === 0) {
-      return [];
+  // Find towers along a route geometry
+  const findTowersAlongRoute = useCallback((towers, routeGeometry, maxDistance = 500) => {
+    if (!map || !towers || towers.length === 0 || !routeGeometry?.coordinates || routeGeometry.coordinates.length < 2) {
+        return [];
     }
     
-    // Helper function to calculate distance between two points in meters
-    const calculateDistance = (lat1, lon1, lat2, lon2) => {
-      const R = 6371e3; // Earth's radius in meters
-      const φ1 = lat1 * Math.PI / 180;
-      const φ2 = lat2 * Math.PI / 180;
-      const Δφ = (lat2 - lat1) * Math.PI / 180;
-      const Δλ = (lon2 - lon1) * Math.PI / 180;
+    const routeCoords = routeGeometry.coordinates; // Expecting GeoJSON [lng, lat] format
+    const towersWithDistance = [];
 
-      const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
-                Math.cos(φ1) * Math.cos(φ2) *
-                Math.sin(Δλ/2) * Math.sin(Δλ/2);
-      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-      return R * c;
-    };
-    
-    // Calculate minimum distance from a point to a line segment
-    const pointToLineDistance = (pointLat, pointLon, lineLat1, lineLon1, lineLat2, lineLon2) => {
-      // Convert to Cartesian coordinates for simplicity
-      const x = pointLat;
-      const y = pointLon;
-      const x1 = lineLat1;
-      const y1 = lineLon1;
-      const x2 = lineLat2;
-      const y2 = lineLon2;
-      
-      // Calculate line length squared
-      const lineLength2 = Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2);
-      if (lineLength2 === 0) {
-        // Line segment is actually a point
-        return calculateDistance(pointLat, pointLon, lineLat1, lineLon1);
-      }
-      
-      // Calculate projection of point onto line
-      const t = Math.max(0, Math.min(1, ((x - x1) * (x2 - x1) + (y - y1) * (y2 - y1)) / lineLength2));
-      const projX = x1 + t * (x2 - x1);
-      const projY = y1 + t * (y2 - y1);
-      
-      // Calculate distance from point to projection
-      return calculateDistance(pointLat, pointLon, projX, projY);
-    };
-    
-    // Find towers close to the route
-    const towersAlongRoute = towers.filter(tower => {
-      // Check if tower is close to any segment of the route
-      for (let i = 0; i < routeCoordinates.length - 1; i++) {
-        const [lat1, lon1] = routeCoordinates[i];
-        const [lat2, lon2] = routeCoordinates[i + 1];
+    // Create a LineString for more accurate distance calculations
+    const routeLine = L.polyline(routeCoords.map(coord => [coord[1], coord[0]]));
+
+    // Process each tower
+    towers.forEach(tower => {
+        const towerPoint = L.latLng(tower.lat, tower.lon);
+        const distance = routeLine.distanceTo(towerPoint);
         
-        const distance = pointToLineDistance(
-          tower.lat, tower.lon,
-          lat1, lon1,
-          lat2, lon2
-        );
-        
-        if (distance <= distanceInMeters) {
-          return true;
+        if (distance <= maxDistance) {
+            towersWithDistance.push({
+                ...tower,
+                distanceToRoute: distance
+            });
         }
-      }
-      return false;
     });
+
+    // Sort by distance to route
+    towersWithDistance.sort((a, b) => a.distanceToRoute - b.distanceToRoute);
+
+    // Smart filtering if too many towers are found
+    if (towersWithDistance.length > 50) {
+        console.log(`Applying smart filter: ${towersWithDistance.length} towers found.`);
+        
+        // Keep all very close towers (within 100m)
+        const veryClose = towersWithDistance.filter(t => t.distanceToRoute <= 100);
+        
+        // Sample mid-distance towers (100-300m)
+        const midDistance = towersWithDistance.filter(t => t.distanceToRoute > 100 && t.distanceToRoute <= 300);
+        const midStep = Math.max(1, Math.floor(midDistance.length / Math.min(midDistance.length, 15)));
+        const sampledMid = midDistance.filter((_, i) => i % midStep === 0);
+        
+        // Sample far-distance towers (300-500m)
+        const farDistance = towersWithDistance.filter(t => t.distanceToRoute > 300 && t.distanceToRoute <= 500);
+        const farStep = Math.max(1, Math.floor(farDistance.length / Math.min(farDistance.length, 10)));
+        const sampledFar = farDistance.filter((_, i) => i % farStep === 0);
+
+        // Combine all sampled towers
+        const filteredTowers = [...veryClose, ...sampledMid, ...sampledFar];
+        
+        // Ensure we don't filter too aggressively
+        if (filteredTowers.length < 10 && towersWithDistance.length >= 10) {
+            console.log("Smart filter result too small, reverting to simple distance filter.");
+            return towersWithDistance;
+        }
+        
+        console.log(`Smart filter applied, ${filteredTowers.length} towers selected.`);
+        return filteredTowers;
+    }
+
+    console.log(`Found ${towersWithDistance.length} towers within ${maxDistance}m of the route.`);
+    return towersWithDistance;
+}, [map]); // Dependency on map for L.polyline
+
+  // Helper function to extract and format directions from route data
+  const extractDirections = (routeData) => {
+    if (!routeData || !routeData.routes || !routeData.routes[0]) {
+      return null;
+    }
+
+    const route = routeData.routes[0];
+    const steps = route.legs?.[0]?.steps || [];
     
-    return towersAlongRoute;
+    // Format distance and duration
+    const distanceKm = route.distance / 1000;
+    const durationMin = route.duration / 60;
+    
+    const formattedSteps = steps.map(step => ({
+      type: step.maneuver?.type || 'straight',
+      instruction: step.maneuver?.instruction || '',
+      distanceFormatted: formatDistance(step.distance / 1000),
+      coordinates: step.maneuver?.location || step.geometry?.coordinates?.[0]
+    }));
+
+    return {
+      distanceFormatted: formatDistance(distanceKm),
+      durationFormatted: formatDuration(route.duration),
+      steps: formattedSteps,
+      isCustomRoute: route.type !== 'fastest'
+    };
   };
 
   // Function to display a route on the map
-  const displayRoute = useCallback((route, allTowersData, routeType) => {
-    if (!map || !route) return;
-    
-    console.log(`Displaying ${routeType} route on map:`, route);
-    console.log(`Route structure: routes=${!!route.routes}, geometry=${!!route.geometry}, legs=${!!route.legs}`);
-    
-    // Remove any existing route from the map
+  const displayRoute = useCallback((routeData, towersAlongRoute = [], routeType) => {
+    if (!map || !routeData) {
+        console.error("displayRoute: Map not ready or no route data provided.");
+        return;
+    }
+
+    // Clear previous route display
     if (routeControlRef.current) {
-      // Check if it's a control (old code) or a layer (new code)
-      if (typeof routeControlRef.current.removeFrom === 'function') {
-        routeControlRef.current.removeFrom(map);
-      } else if (typeof routeControlRef.current.remove === 'function') {
         map.removeLayer(routeControlRef.current);
-      }
-      routeControlRef.current = null;
-      setRouteControl(null);
     }
-    
-    // Clear any active step marker
-    if (activeStepMarker) {
-      map.removeLayer(activeStepMarker);
-      setActiveStepMarker(null);
-    }
-    
-    // Reset active step
-    setActiveDirectionStep(null);
-    
+
     try {
-      // Check if we have route data in the expected format
-      // Handle both OSRM format (route.routes[0].geometry) and custom format (route.geometry)
-      let routeGeometry;
-      
-      if (route.routes && route.routes[0] && route.routes[0].geometry) {
-        // OSRM format
-        routeGeometry = route.routes[0].geometry;
-      } else if (route.geometry) {
-        // Custom route format
-        routeGeometry = route.geometry;
-      } else {
-        console.error("Invalid route data format:", route);
-        throw new Error("Invalid route data format");
-      }
-      
-      console.log("Route geometry found:", routeGeometry);
-      
-      // Create a new polyline for the route
-      const routeCoordinates = routeGeometry.coordinates.map(coord => [coord[1], coord[0]]);
-      
-      // Validate coordinates
-      if (!routeCoordinates || routeCoordinates.length < 2) {
-        console.error("Invalid route coordinates:", routeCoordinates);
-        throw new Error("Invalid route coordinates");
-      }
-      
-      console.log(`Creating route with ${routeCoordinates.length} points`);
-      console.log("First point:", routeCoordinates[0]);
-      console.log("Last point:", routeCoordinates[routeCoordinates.length - 1]);
-      
-      // Instead of using L.Routing.control, draw the route directly as a polyline
-      // This avoids making additional API calls to Mapbox that cause CORS errors
-      if (routeControlRef.current) {
-        // This is already handled above, but just to be sure
-        map.removeLayer(routeControlRef.current);
-      }
-      
-      // Create a polyline for the route
-      const routeColor = routeType === 'fastest' ? '#4285F4' : 
-                        routeType === 'cell_coverage' ? '#0F9D58' : 
-                        '#F4B400';
-                        
-      const routePolyline = L.polyline(routeCoordinates, {
-        color: routeColor,
-        opacity: 0.8,
-        weight: 6,
-        lineJoin: 'round'
-      }).addTo(map);
-      
-      // Store the polyline in the ref for later cleanup
-      routeControlRef.current = routePolyline;
-      setRouteControl(routePolyline);
-      
-      // Find towers along the route
-      let towersAlongRoute = [];
-      if (allTowersData && allTowersData.length > 0) {
-        // Use the findTowersAlongRoute function to get towers near the route
-        towersAlongRoute = findTowersAlongRoute(allTowersData, routeCoordinates, 500);
-        console.log(`Found ${towersAlongRoute.length} towers along the ${routeType} route`);
-        
-        // Store these towers for display
-            setRouteTowers(towersAlongRoute);
-      }
-      
-      // Create route information for display
-      const routeInfo = {
-        routeType: routeType,
-        distance: route.distance,
-        distanceFormatted: formatDistance(route.distance / 1000),
-        duration: route.duration,
-        durationFormatted: formatDuration(route.duration),
-        calculatedSignalQuality: route.signalScore || calculateSignalScore(towersAlongRoute),
-        towerCount: towersAlongRoute.length
-      };
-      
-      // Set route info in state
-      setRouteInfo(routeInfo);
-      
-      // Handle directions if available - check both formats
-      const hasOsrmDirections = route.routes && route.routes[0] && route.routes[0].legs && 
-                               route.routes[0].legs[0] && route.routes[0].legs[0].steps;
-      const hasCustomDirections = route.legs && route.legs.length > 0 && route.legs[0].steps;
-      
-      if (hasOsrmDirections) {
-        // OSRM format directions
-        const directions = {
-          distance: route.distance,
-          distanceFormatted: formatDistance(route.distance / 1000),
-          duration: route.duration,
-          durationFormatted: formatDuration(route.duration),
-          isCustomRoute: false,
-          steps: route.routes[0].legs[0].steps.map(step => ({
-            instruction: step.maneuver ? step.maneuver.instruction : "Continue on route",
-            distance: step.distance,
-            distanceFormatted: formatDistance(step.distance / 1000),
-            duration: step.duration,
-            durationFormatted: formatDuration(step.duration),
-            type: step.maneuver ? step.maneuver.type : "unknown",
-            coordinates: step.geometry ? step.geometry.coordinates : null
-          }))
-        };
-        
-        // Set route directions in state
-        setRouteDirections(directions);
-        
-        // Show directions panel
-        setShowDirections(true);
-        setIsDirectionsMinimized(false);
-      } else if (hasCustomDirections) {
-        // Custom route format directions
-        const directions = {
-          distance: route.distance,
-          distanceFormatted: formatDistance(route.distance / 1000),
-          duration: route.duration,
-          durationFormatted: formatDuration(route.duration),
-          isCustomRoute: true,
-          steps: route.legs[0].steps.map(step => ({
-            instruction: step.instruction || "Continue on route",
-            distance: step.distance,
-            distanceFormatted: formatDistance(step.distance / 1000),
-            duration: step.duration || 0,
-            durationFormatted: formatDuration(step.duration || 0),
-            type: step.type || "unknown",
-            bearing: step.bearing || 0,
-            coordinates: routeGeometry.coordinates // Use route coordinates since custom steps might not have geometry
-          }))
-        };
-        
-        // Set route directions in state
-        setRouteDirections(directions);
-        
-        // Show directions panel
-        setShowDirections(true);
-        setIsDirectionsMinimized(false);
-      } else {
-        console.warn("Route data missing legs/steps information for directions");
-        
-        // For custom routes, try to generate basic directions
-        if (route.custom_route) {
-          console.log("Generating basic directions for custom route");
-          
-          // Create a simple direction object with basic information
-          const directions = {
-            distance: route.distance,
-            distanceFormatted: formatDistance(route.distance / 1000),
-            duration: route.duration,
-            durationFormatted: formatDuration(route.duration),
-            isCustomRoute: true,
-            steps: [
-              {
-                instruction: "Start route",
-                distance: 0,
-                distanceFormatted: "0 km",
-                duration: 0,
-                durationFormatted: "0 min",
-                type: "depart",
-                coordinates: routeGeometry.coordinates.slice(0, Math.min(10, routeGeometry.coordinates.length))
-              },
-              {
-                instruction: "Follow the route displayed on map",
-                distance: route.distance,
-                distanceFormatted: formatDistance(route.distance / 1000),
-                duration: route.duration,
-                durationFormatted: formatDuration(route.duration),
-                type: "continue",
-                coordinates: routeGeometry.coordinates
-              },
-              {
-                instruction: "Arrive at destination",
-                distance: 0,
-                distanceFormatted: "0 km",
-                duration: 0,
-                durationFormatted: "0 min",
-                type: "arrive",
-                coordinates: routeGeometry.coordinates.slice(Math.max(0, routeGeometry.coordinates.length - 10))
-              }
-            ]
-          };
-          
-          // Set basic directions
-          setRouteDirections(directions);
-          setShowDirections(true);
-          setIsDirectionsMinimized(false);
-        } else {
-          setShowDirections(false);
+        // Get route coordinates from the first route in the routes array
+        const route = routeData.routes[0];
+        if (!route || !route.geometry || !route.geometry.coordinates) {
+            console.error("Invalid route data structure:", routeData);
+            throw new Error("Invalid route data structure");
         }
-      }
-      
-      // Clear any calculation animation
-      if (calculationAnimation && calculationAnimation.cleanup) {
-        calculationAnimation.cleanup();
-        setCalculationAnimation(null);
-      }
-      
-      // Set loading to false
-      setIsLoadingRoute(false);
-      
+
+        const routeCoordinates = route.geometry.coordinates.map(coord => [coord[1], coord[0]]);
+        
+        // Create and add the route line
+        const routeLine = L.polyline(routeCoordinates, {
+            color: getRouteLineColor(routeType),
+            weight: 5,
+            opacity: 0.8
+        }).addTo(map);
+
+        // Store the route control reference
+        routeControlRef.current = routeLine;
+
+        // Fit map to show the entire route
+        map.fitBounds(routeLine.getBounds(), { padding: [50, 50] });
+
+        // Update route info
+        const distanceKm = route.distance / 1000;
+        const durationMin = route.duration / 60;
+        const signalQuality = calculateSignalScore(towersAlongRoute);
+
+        setRouteInfo({
+            distance: distanceKm,
+            duration: route.duration,
+            signalQuality: signalQuality,
+            routeType: routeType,
+            towerCount: towersAlongRoute.length
+        });
+
+        // Update route towers state
+        setRouteTowers(towersAlongRoute);
+
+        // If cell towers are currently shown, update their display
+        if (showCellTowers) {
+            // Force a re-render of the cell towers layer
+            setShowCellTowers(false);
+            setTimeout(() => setShowCellTowers(true), 0);
+        }
+
+        // Extract and set directions
+        const directions = extractDirections(routeData);
+        if (directions) {
+            setRouteDirections(directions);
+            setShowDirections(true);
+        }
+
     } catch (error) {
-      console.error(`Error displaying ${routeType} route:`, error);
-      setIsLoadingRoute(false);
-      
-      // Clear calculation animation on error
-      if (calculationAnimation && calculationAnimation.cleanup) {
-        calculationAnimation.cleanup();
-        setCalculationAnimation(null);
-      }
-      
-      toast.error("Error displaying route. Please try again.", {
-        position: "top-center",
-        autoClose: 3000,
-      });
+        console.error("Error displaying route:", error);
+        toast.error("Error displaying route");
     }
-  }, [map, activeStepMarker, findTowersAlongRoute, calculateSignalScore, calculationAnimation]);
+}, [map, showCellTowers, calculateSignalScore, extractDirections]);
 
   // Function to toggle cell tower visibility
   const toggleCellTowers = useCallback(() => {
@@ -1061,11 +902,8 @@ function App() {
     // Make sure allTowers is initialized
     if (!allTowers || !allTowers.current) {
       console.log("Initializing allTowers in toggleCellTowers");
-      if (!allTowers) {
-        // This is a serious issue, but we'll try to recover
-        console.warn("allTowers ref is undefined in toggleCellTowers");
-        allTowers = { current: [] };
-      } else {
+      // Initialize the current property if it doesn't exist
+      if (!allTowers.current) {
         allTowers.current = [];
       }
     }
@@ -1097,74 +935,93 @@ function App() {
           console.log("Fetching cell towers for the current map view");
           console.log(`Bounds: ${south}, ${west}, ${north}, ${east}`);
     
-    // Step 1: Fetch cell towers first
-    fetchCellTowers({
+          // Step 1: Fetch cell towers first
+          fetchCellTowers({
             min_lat: south,
             min_lng: west,
             max_lat: north,
             max_lng: east
-    }).then(towers => {
-      // Store all towers for the area
-      setCellTowers(towers);
-       
+          }).then(towers => {
+            // Store all towers for the area
+            setCellTowers(towers);
+            
             // Store in allTowers ref for calculations
             allTowers.current = towers || [];
             
-            // Immediately capture the current route points to prevent race conditions
-            // but only if they exist
-            if (routeStartPoint && routeEndPoint) {
-              const capturedRoutePoints = {
-                start: { ...routeStartPoint },
-                end: { ...routeEndPoint }
-              };
-              
-              // Update our state to be consistent with what we captured
-              setCurrentRoutePoints(capturedRoutePoints);
-      
-      // If "Don't ask again" is enabled, directly calculate all routes
-      if (skipRouteTypeSelection) {
-                // Set loading state
-                setIsLoadingRoute(true);
-                
-                // Use a small delay to ensure state updates
-                setTimeout(() => {
-                  // Pass our captured points directly to calculateAllRouteTypes
-                  console.log("Calculating routes with explicitly captured points:", capturedRoutePoints);
-                  calculateAllRouteTypes(capturedRoutePoints);
-                }, 50);
-      } else {
-        // Show route selection dialog if not skipping
-        setShowRouteTypeSelection(true);
-                setIsLoadingRoute(false);
-              }
-            } else {
-              // No route points set yet - just complete fetch without calculating route
-              console.log("No route points set yet, skipping route calculation after cell tower fetch");
-      }
-    }).catch(error => {
-      setIsLoadingRoute(false);
-      console.error('Error fetching cell towers:', error);
-            
-            // Initialize allTowers even on error
-            allTowers.current = [];
-            
-            // Clean up animation on error
-            cleanupAnimation();
-      
-      // Show error message
-      toast.error('Error fetching cell tower data. Please try again.', {
-        position: "top-center",
-        autoClose: 5000,
-      });
-    });
-        } else {
-          console.error("Map bounds not available");
+            // Display the towers if showCellTowers is true
+            if (showCellTowers) {
+              displayCellTowers(towers);
+            }
+          }).catch(error => {
+            console.error('Error fetching cell towers:', error);
+            toast.error('Error fetching cell tower data. Please try again.', {
+              position: "top-center",
+              autoClose: 5000,
+            });
+          });
         }
       } catch (error) {
         console.error("Error getting map bounds:", error);
       }
+    } else if (showCellTowers) {
+      // If we already have towers and showCellTowers is true, display them
+      displayCellTowers(cellTowers);
+    } else {
+      // If showCellTowers is false, remove the tower layer
+      if (cellTowerLayerRef.current) {
+        map.removeLayer(cellTowerLayerRef.current);
+        cellTowerLayerRef.current = null;
+      }
     }
-  }, [map, cellTowers.length, fetchCellTowers]);
+  }, [map, cellTowers.length, fetchCellTowers, showCellTowers]);
+
+  // Function to display cell towers on the map
+  const displayCellTowers = useCallback((towers) => {
+    if (!map || !towers || towers.length === 0) return;
+
+    // Remove existing tower layer if it exists
+    if (cellTowerLayerRef.current) {
+      map.removeLayer(cellTowerLayerRef.current);
+    }
+
+    // Create a new layer group for the towers
+    const towerLayer = L.layerGroup();
+
+    // Add each tower as a marker
+    towers.forEach(tower => {
+      // Determine signal strength class based on average signal
+      const signalStrength = tower.averageSignal || -100;
+      let signalClass = 'weak';
+      if (signalStrength > -70) signalClass = 'strong';
+      else if (signalStrength > -90) signalClass = 'medium';
+
+      // Create custom icon for the tower
+      const icon = L.divIcon({
+        html: `<div class="cell-tower-marker ${signalClass}"></div>`,
+        className: '',
+        iconSize: [12, 12],
+        iconAnchor: [6, 6]
+      });
+
+      // Create marker and add to layer
+      const marker = L.marker([tower.lat, tower.lon], { icon });
+      towerLayer.addLayer(marker);
+    });
+
+    // Add the layer to the map
+    towerLayer.addTo(map);
+    cellTowerLayerRef.current = towerLayer;
+  }, [map]);
+
+  // Effect to handle cell tower display when showCellTowers changes
+  useEffect(() => {
+    if (showCellTowers && cellTowers.length > 0) {
+      displayCellTowers(cellTowers);
+    } else if (!showCellTowers && cellTowerLayerRef.current) {
+      map.removeLayer(cellTowerLayerRef.current);
+      cellTowerLayerRef.current = null;
+    }
+  }, [showCellTowers, cellTowers, displayCellTowers, map]);
 
   // Ensure processAllRoutes is defined BEFORE calculateAllRouteTypes to fix function order
   const processAllRoutes = useCallback((routes, towers, allTowersData) => {
@@ -1273,11 +1130,8 @@ function App() {
     // Initialize allTowers if it doesn't exist
     if (!allTowers || !allTowers.current) {
       console.log("Initializing allTowers reference");
-      if (!allTowers) {
-        // Create the ref object if it doesn't exist
-        allTowers = { current: [] };
-        } else {
-        // Just initialize the current property
+      // Initialize the current property if it doesn't exist
+      if (!allTowers.current) {
         allTowers.current = [];
       }
     }
@@ -1382,29 +1236,26 @@ function App() {
             allRoutes.push(route);
             allRouteTowers.push(result.towers || []);
             
-            // Display this route immediately if it matches the user's selected type
+            // Update the route state immediately when this route is calculated
+            setComputedRoutes(prev => ({
+              ...prev,
+              [routeConfig.type]: route
+            }));
+            
+            // Update towers for this route immediately
+            setComputedRouteTowers(prev => ({
+              ...prev,
+              [routeConfig.type]: result.towers || []
+            }));
+            
+            // Display this route if it matches the user's selected type
             if (routeConfig.type === routeType) {
               console.log(`Displaying ${routeConfig.type} route immediately as it matches selected route type`);
-              // Display this route right away
               displayRoute(route, result.towers || [], routeConfig.type);
-              
-              // Update the route state to indicate this type is calculated
-              setComputedRoutes(prev => ({
-                ...prev,
-                [routeConfig.type]: route
-              }));
-              
-              // Update towers for this route
-              setComputedRouteTowers(prev => ({
-                ...prev,
-                [routeConfig.type]: result.towers || []
-              }));
-              
-              // Show loading is done for this route specifically
               setIsLoadingRoute(false);
             }
           }
-    } catch (error) {
+        } catch (error) {
           console.error(`Error calculating ${routeConfig.type} route:`, error);
         }
       }
@@ -1440,51 +1291,19 @@ function App() {
         setCalculationAnimation(null);
         
         // Add the routes to our cache for faster future lookups
-        setRouteCache(prev => {
-          // Create the cache entry
-          const cacheEntry = {
-            routes: {
-              fastest: allRoutes.find(r => r.type === 'fastest'),
-              cell_coverage: allRoutes.find(r => r.type === 'cell_coverage'),
-              balanced: allRoutes.find(r => r.type === 'balanced'),
-              allRoutes: allRoutes
-            },
-            towers: {
-              fastest: allRouteTowers[allRoutes.findIndex(r => r.type === 'fastest')] || [],
-              cell_coverage: allRouteTowers[allRoutes.findIndex(r => r.type === 'cell_coverage')] || [],
-              balanced: allRouteTowers[allRoutes.findIndex(r => r.type === 'balanced')] || [],
-            }
-          };
-          
-          // Log the cache entry to verify route types
-          console.log("Creating cache entry with routes:", {
-            fastest: cacheEntry.routes.fastest ? 'found' : 'not found',
-            cell_coverage: cacheEntry.routes.cell_coverage ? 'found' : 'not found',
-            balanced: cacheEntry.routes.balanced ? 'found' : 'not found'
-          });
-          
-          if (!cacheEntry.routes.cell_coverage) {
-            console.warn("MISSING cell_coverage route in cache. Routes array:", 
-              allRoutes.map(r => ({type: r.type, hasGeometry: !!(r.routes && r.routes[0] && r.routes[0].geometry)}))
-            );
-            
-            // Fall back to balanced route if available
-            if (cacheEntry.routes.balanced) {
-              console.log("Using balanced route as fallback for cell_coverage");
-              cacheEntry.routes.cell_coverage = cacheEntry.routes.balanced;
-            }
-            // Or fastest route if available
-            else if (cacheEntry.routes.fastest) {
-              console.log("Using fastest route as fallback for cell_coverage");
-              cacheEntry.routes.cell_coverage = cacheEntry.routes.fastest;
-            }
+        setRouteCache(prev => ({
+          ...prev,
+          [cacheKey]: {
+            routes: allRoutes.reduce((acc, route) => ({
+              ...acc,
+              [route.type]: route
+            }), {}),
+            towers: allRouteTowers.reduce((acc, towers, index) => ({
+              ...acc,
+              [allRoutes[index].type]: towers
+            }), {})
           }
-          
-          return {
-            ...prev,
-            [cacheKey]: cacheEntry
-          };
-        });
+        }));
       } else {
         setIsLoadingRoute(false);
         setCalculationAnimation(null);
@@ -1757,46 +1576,46 @@ function App() {
       }
       
       // Close the modal
-        setShowRouteTypeSelection(false);
+      setShowRouteTypeSelection(false);
+      
+      // Set loading state
+      setIsLoadingRoute(true);
+      
+      // Use a short timeout to ensure we have the latest state
+      setTimeout(() => {
+        // Try to get the route from various sources
+        let selectedRoute = computedRoutes[selectedType];
+        console.log(`Looking for ${selectedType} route in computedRoutes:`, selectedRoute ? 'found' : 'not found');
         
-      // Only attempt to display a route if we have routes computed
-      if (allRoutesComputed) {
-        // Set loading state
-        setIsLoadingRoute(true);
+        // If not found, try to find it in the allRoutes array
+        if (!selectedRoute && computedRoutes.allRoutes && computedRoutes.allRoutes.length > 0) {
+          console.log("Available types in allRoutes:", computedRoutes.allRoutes.map(r => r.type));
+          selectedRoute = computedRoutes.allRoutes.find(r => r.type === selectedType);
+        }
         
-        // Use a short timeout to ensure we have the latest state
-        setTimeout(() => {
-          // Try to get the route from various sources
-          let selectedRoute = computedRoutes[selectedType];
-          console.log(`Looking for ${selectedType} route in computedRoutes:`, selectedRoute ? 'found' : 'not found');
+        // If found, display the route
+        if (selectedRoute) {
+          // Make sure we have valid towers
+          let towersToUse = computedRouteTowers[selectedType] || allTowers.current || [];
           
-          // If not found, try to find it in the allRoutes array
-          if (!selectedRoute && computedRoutes.allRoutes && computedRoutes.allRoutes.length > 0) {
-            console.log("Available types in allRoutes:", computedRoutes.allRoutes.map(r => r.type));
-            selectedRoute = computedRoutes.allRoutes.find(r => r.type === selectedType);
-          }
-          
-          // If found, display the route
-          if (selectedRoute) {
-            // Make sure we have valid towers
-            let towersToUse = computedRouteTowers[selectedType] || allTowers.current || [];
-            
-            // Display the route with appropriate towers
-            displayRoute(selectedRoute, towersToUse, selectedType);
-            setIsLoadingRoute(false);
+          // Display the route with appropriate towers
+          displayRoute(selectedRoute, towersToUse, selectedType);
+          setIsLoadingRoute(false);
         } else {
-            console.error(`Could not find route data for ${selectedType}`);
-            
-            // Try to calculate if not in calculation mode already
-            if (!routesStillLoading && hasValidRoutePoints()) {
-              console.log("Triggering calculation for selected route type.");
-              calculateAllRouteTypes(currentRoutePoints);
-            } else {
-              setIsLoadingRoute(false);
-            }
+          console.log(`Route type ${selectedType} not yet calculated, clearing previous route`);
+          
+          // Clear the previous route display
+          clearRouteDisplayRef.current?.();
+          
+          // Try to calculate if not in calculation mode already
+          if (!routesStillLoading && hasValidRoutePoints()) {
+            console.log("Triggering calculation for selected route type.");
+            calculateAllRouteTypes(currentRoutePoints);
+          } else {
+            setIsLoadingRoute(false);
           }
-        }, 200);
-      }
+        }
+      }, 200);
     };
     
     const handleDontAskAgainChange = (e) => {
@@ -1832,8 +1651,9 @@ function App() {
           
           <div className="route-selection-options">
             <button 
-              className={`route-selection-option ${routeType === 'fastest' ? 'active' : ''} ${computedRoutes.fastest ? 'available' : ''}`}
+              className={`route-selection-option ${routeType === 'fastest' ? 'active' : ''} ${computedRoutes.fastest ? 'available' : 'disabled'}`}
               onClick={() => handleRouteTypeSelect('fastest')}
+              disabled={!computedRoutes.fastest}
             >
               <div className="route-selection-icon">⚡</div>
               <div className="route-selection-label">Fastest</div>
@@ -1846,8 +1666,9 @@ function App() {
             </button>
             
             <button 
-              className={`route-selection-option ${routeType === 'cell_coverage' ? 'active' : ''} ${computedRoutes.cell_coverage ? 'available' : ''}`}
+              className={`route-selection-option ${routeType === 'cell_coverage' ? 'active' : ''} ${computedRoutes.cell_coverage ? 'available' : 'disabled'}`}
               onClick={() => handleRouteTypeSelect('cell_coverage')}
+              disabled={!computedRoutes.cell_coverage}
             >
               <div className="route-selection-icon">📱</div>
               <div className="route-selection-label">Best Signal</div>
@@ -1860,8 +1681,9 @@ function App() {
             </button>
             
             <button 
-              className={`route-selection-option ${routeType === 'balanced' ? 'active' : ''} ${computedRoutes.balanced ? 'available' : ''}`}
+              className={`route-selection-option ${routeType === 'balanced' ? 'active' : ''} ${computedRoutes.balanced ? 'available' : 'disabled'}`}
               onClick={() => handleRouteTypeSelect('balanced')}
+              disabled={!computedRoutes.balanced}
             >
               <div className="route-selection-icon">⚖️</div>
               <div className="route-selection-label">Balanced</div>
@@ -1911,6 +1733,20 @@ function App() {
       L.DomEvent.disableScrollPropagation(directionsContentRef.current);
     }
   }, [directionsContentRef, showDirections, isDirectionsMinimized]);
+
+  // Helper function to get route line color based on type
+  const getRouteLineColor = (routeType) => {
+    switch (routeType) {
+        case 'fastest':
+            return '#4285F4'; // Google Blue
+        case 'cell_coverage':
+            return '#0F9D58'; // Google Green
+        case 'balanced':
+            return '#F4B400'; // Google Yellow
+        default:
+            return '#4285F4'; // Default to blue
+    }
+  };
 
   return (
     <div className="app-container">

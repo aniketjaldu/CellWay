@@ -1569,3 +1569,28 @@ html, body {
   font-style: italic;
   font-size: 12px;
 }
+
+.route-selection-option.disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background-color: #f5f5f5;
+  border-color: #ddd;
+  pointer-events: none;
+}
+
+.route-selection-option.disabled:hover {
+  transform: none;
+  box-shadow: none;
+  border-color: #ddd;
+}
+
+.route-selection-option.disabled .route-selection-icon,
+.route-selection-option.disabled .route-selection-label,
+.route-selection-option.disabled .route-selection-desc {
+  color: #999;
+}
+
+.route-selection-option.disabled .calculating {
+  color: #666;
+  font-style: italic;
+}
