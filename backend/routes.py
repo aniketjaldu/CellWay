@@ -132,46 +132,54 @@ def get_route():
                 end_lng = float(end_lng)
             except ValueError:
                 return jsonify({'error': 'Coordinates must be valid numbers'}), 400
-        except Exception as e:
-            # If that fails, try to get OSRM-style waypoints parameter
-            waypoints_param = request.args.get('waypoints')
-            if not waypoints_param:
-                return jsonify({'error': 'Missing coordinates parameters'}), 400
                 
-            # Parse waypoints in OSRM format: long1,lat1;long2,lat2
-            waypoints = waypoints_param.split(';')
-            if len(waypoints) < 2:
-                return jsonify({'error': 'At least 2 waypoints required'}), 400
+            # Get optional route type (defaults to balanced)
+            route_type = request.args.get('route_type', 'balanced')
+            if route_type not in ['fastest', 'cell_coverage', 'balanced']:
+                route_type = 'balanced'  # Default to balanced if invalid
                 
-            start_coords = waypoints[0].split(',')
-            end_coords = waypoints[1].split(',')
+            # Get optional algorithm type (defaults based on route_type)
+            algorithm = request.args.get('algorithm')
             
-            if len(start_coords) < 2 or len(end_coords) < 2:
-                return jsonify({'error': 'Invalid coordinate format'}), 400
-                
-            # OSRM provides lng,lat but our functions expect lat,lng
-            try:
-                start_lng, start_lat = float(start_coords[0]), float(start_coords[1])
-                end_lng, end_lat = float(end_coords[0]), float(end_coords[1])
-            except ValueError:
-                return jsonify({'error': 'Coordinates must be valid numbers'}), 400
+            # Get optional signal weight for custom algorithm (defaults based on route_type)
+            weight = request.args.get('weight')
+            if weight is not None:
+                try:
+                    weight = float(weight)
+                    # Ensure weight is between 0 and 1
+                    weight = max(0.0, min(1.0, weight))
+                except ValueError:
+                    weight = None  # Use default if invalid
+            
+            print(f"Calculating route from ({start_lat}, {start_lng}) to ({end_lat}, {end_lng})")
+            print(f"Route type: {route_type}, Algorithm: {algorithm}, Weight: {weight}")
+            
+        except Exception as e:
+            # Handle parameter parsing errors
+            return jsonify({'error': f'Parameter error: {str(e)}'}), 400
         
-        # Validate coordinate ranges
-        if not (-90 <= start_lat <= 90) or not (-90 <= end_lat <= 90):
-            return jsonify({'error': 'Latitude must be between -90 and 90'}), 400
-        if not (-180 <= start_lng <= 180) or not (-180 <= end_lng <= 180):
-            return jsonify({'error': 'Longitude must be between -180 and 180'}), 400
-        
-        # Default to balanced route type if not specified
-        route_type = request.args.get('route_type', 'balanced')
-        
-        # Get route based on the requested optimization type
-        if route_type == 'cell_coverage':
-            result = services.get_route_cell_coverage(start_lat, start_lng, end_lat, end_lng)
-        elif route_type == 'fastest':
-            result = services.get_route_fastest(start_lat, start_lng, end_lat, end_lng)
-        else:  # balanced
-            result = services.get_route_balanced(start_lat, start_lng, end_lat, end_lng)
+        # Get route based on the requested optimization type and algorithm
+        if algorithm == 'custom':
+            if route_type == 'cell_coverage':
+                # Use high signal weight if not specified
+                signal_weight = weight if weight is not None else 0.8
+                result = services.calculate_custom_route(start_lat, start_lng, end_lat, end_lng, signal_weight=signal_weight)
+            elif route_type == 'balanced':
+                # Use medium signal weight if not specified
+                signal_weight = weight if weight is not None else 0.5
+                result = services.calculate_custom_route(start_lat, start_lng, end_lat, end_lng, signal_weight=signal_weight)
+            else:  # fastest with custom algorithm (unusual, but supported)
+                # Use low signal weight if not specified
+                signal_weight = weight if weight is not None else 0.0
+                result = services.calculate_custom_route(start_lat, start_lng, end_lat, end_lng, signal_weight=signal_weight)
+        else:
+            # Use original OSRM-based algorithms
+            if route_type == 'cell_coverage':
+                result = services.get_route_cell_coverage(start_lat, start_lng, end_lat, end_lng)
+            elif route_type == 'fastest':
+                result = services.get_route_fastest(start_lat, start_lng, end_lat, end_lng)
+            else:  # balanced
+                result = services.get_route_balanced(start_lat, start_lng, end_lat, end_lng)
         
         # If OSRM response has an error, handle it
         if 'code' in result and result['code'] != 'Ok':
@@ -179,7 +187,6 @@ def get_route():
             
         # Set the content type to application/json explicitly 
         return jsonify(result), 200, {'Content-Type': 'application/json'}
-        
     except (TypeError, ValueError) as e:
         print(f"Parameter error: {str(e)}")  # Log the error
         return jsonify({'error': f'Invalid parameters: {str(e)}'}), 400
@@ -213,6 +220,20 @@ def get_saved_routes():
     user_id = session.get('user_id')
     routes = models.get_saved_routes(user_id)
     return jsonify(routes)
+
+@api_bp.route('/towers', methods=['GET'])
+def get_towers():
+    """Endpoint for getting cell tower data for a bounding box"""
+    try:
+        min_lat = float(request.args.get('min_lat'))
+        min_lng = float(request.args.get('min_lng'))
+        max_lat = float(request.args.get('max_lat'))
+        max_lng = float(request.args.get('max_lng'))
+    except (TypeError, ValueError):
+        return jsonify({'error': 'Valid bounding box parameters are required'}), 400
+    
+    cell_data = services.get_cell_towers(min_lat, min_lng, max_lat, max_lng)
+    return jsonify(cell_data)
 
 @api_bp.route('/cell-coverage', methods=['GET'])
 def get_cell_coverage():

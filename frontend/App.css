@@ -83,33 +83,35 @@ html, body {
 
 /* Custom marker styles */
 .origin-marker {
-  width: 18px;
-  height: 18px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   background-color: #2A93EE;
-  border: 2px solid white;
-  box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
+  border: 3px solid white;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.3), 0 0 10px rgba(0, 0, 0, 0.5);
   animation: pulse 1.5s infinite;
+  z-index: 1000 !important;
 }
 
 .destination-marker {
-  width: 18px;
-  height: 18px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   background-color: #EE2A2A;
-  border: 2px solid white;
-  box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
+  border: 3px solid white;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.3), 0 0 10px rgba(0, 0, 0, 0.5);
+  z-index: 1000 !important;
 }
 
 @keyframes pulse {
   0% {
-    box-shadow: 0 0 0 0 rgba(42, 147, 238, 0.7);
+    box-shadow: 0 0 0 0 rgba(42, 147, 238, 0.7), 0 0 0 2px rgba(0, 0, 0, 0.3);
   }
   70% {
-    box-shadow: 0 0 0 15px rgba(42, 147, 238, 0);
+    box-shadow: 0 0 0 15px rgba(42, 147, 238, 0), 0 0 0 2px rgba(0, 0, 0, 0.3);
   }
   100% {
-    box-shadow: 0 0 0 0 rgba(42, 147, 238, 0);
+    box-shadow: 0 0 0 0 rgba(42, 147, 238, 0), 0 0 0 2px rgba(0, 0, 0, 0.3);
   }
 }
 
@@ -165,7 +167,7 @@ html, body {
   background-color: white;
   border-radius: 16px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
-  overflow: hidden;
+  overflow: visible;
   animation: slideDown 0.3s ease;
   z-index: 1000;
 }
@@ -215,8 +217,10 @@ html, body {
   border-color: #2A93EE;
 }
 
+/* Input container with proper positioning for suggestions dropdown */
 .input-container {
   flex: 1;
+  position: relative;
 }
 
 .input-group input {
@@ -229,18 +233,18 @@ html, body {
   outline: none;
 }
 
-/* Enhanced suggestions */
+/* Enhanced suggestions dropdown */
 .suggestions-dropdown {
   background-color: white;
   border-radius: 12px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
   position: absolute;
-  left: 16px;
-  right: 16px;
-  z-index: 1002;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 1005;
   max-height: 200px;
   overflow-y: auto;
-  animation: dropdownFadeIn 0.2s ease;
   margin-top: 5px;
   border: 1px solid #eaeaea;
 }
@@ -308,13 +312,20 @@ html, body {
 /* Improve route info display */
 .route-info {
   margin-top: 20px;
-  padding: 16px;
+  padding: 12px;
   background-color: #f4f8ff;
   border-radius: 12px;
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.route-detail {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
 }
 
 /* Enhanced cell tower toggle button */
@@ -406,20 +417,75 @@ html, body {
   box-shadow: 0 4px 12px rgba(42, 147, 238, 0.3);
 }
 
+/* Disabled button style */
+.map-control-button.disabled {
+  background-color: #e0e0e0;
+  color: #999;
+  cursor: not-allowed;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.map-control-button.disabled:hover {
+  transform: none;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
 /* Enhanced Cell tower marker styles */
 .cell-tower-marker {
-  width: 16px;
-  height: 16px;
+  width: 100%;
+  height: 100%;
   border-radius: 50%;
-  background-color: rgba(64, 196, 255, 0.8);
-  border: 2px solid rgba(0, 140, 255, 0.9);
-  box-shadow: 0 0 8px rgba(0, 140, 255, 0.6);
+  background-color: rgba(64, 196, 255, 0.7);
+  border: 1px solid rgba(0, 140, 255, 0.8);
+  box-shadow: 0 0 4px rgba(0, 140, 255, 0.5);
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
   transition: all 0.3s ease;
   z-index: 800;
+}
+
+/* Cell tower strength indicators */
+.cell-tower-marker.strong {
+  background-color: rgba(76, 217, 100, 0.7);
+  border-color: rgba(52, 199, 89, 0.8);
+  box-shadow: 0 0 4px rgba(52, 199, 89, 0.5);
+}
+
+.cell-tower-marker.medium {
+  background-color: rgba(255, 204, 0, 0.7);
+  border-color: rgba(255, 184, 0, 0.8);
+  box-shadow: 0 0 4px rgba(255, 184, 0, 0.5);
+}
+
+.cell-tower-marker.weak {
+  background-color: rgba(255, 90, 50, 0.7);
+  border-color: rgba(255, 59, 48, 0.8);
+  box-shadow: 0 0 4px rgba(255, 59, 48, 0.5);
+}
+
+/* Highlight towers along the route */
+.cell-tower-marker.along-route {
+  background-color: rgba(255, 255, 255, 0.7);
+  border: 2px solid #FF9500;
+  box-shadow: 0 0 6px rgba(255, 149, 0, 0.8), 0 0 2px #fff inset;
+  z-index: 850;
+}
+
+.cell-tower-marker.along-route.strong {
+  border-color: rgba(52, 199, 89, 1);
+  box-shadow: 0 0 6px rgba(52, 199, 89, 0.8), 0 0 2px #fff inset;
+}
+
+.cell-tower-marker.along-route.medium {
+  border-color: rgba(255, 184, 0, 1);
+  box-shadow: 0 0 6px rgba(255, 184, 0, 0.8), 0 0 2px #fff inset;
+}
+
+.cell-tower-marker.along-route.weak {
+  border-color: rgba(255, 59, 48, 1);
+  box-shadow: 0 0 6px rgba(255, 59, 48, 0.8), 0 0 2px #fff inset;
 }
 
 .cell-tower-marker::before {
@@ -431,32 +497,6 @@ html, body {
   background: transparent;
   border: 2px solid rgba(64, 196, 255, 0.4);
   animation: signal-pulse 2s infinite;
-}
-
-.cell-tower-marker.strong {
-  background-color: rgba(80, 220, 100, 0.9);
-  border: 2px solid rgba(0, 180, 0, 1);
-  box-shadow: 0 0 10px rgba(0, 180, 0, 0.7);
-  transform: scale(1.2);
-}
-
-.cell-tower-marker.strong::before {
-  border: 2px solid rgba(80, 220, 100, 0.5);
-  width: 42px;
-  height: 42px;
-}
-
-.cell-tower-marker.weak {
-  background-color: rgba(255, 120, 80, 0.9);
-  border: 2px solid rgba(200, 60, 0, 1);
-  box-shadow: 0 0 10px rgba(200, 60, 0, 0.6);
-  transform: scale(0.9);
-}
-
-.cell-tower-marker.weak::before {
-  border: 2px solid rgba(255, 120, 80, 0.5);
-  width: 30px;
-  height: 30px;
 }
 
 @keyframes signal-pulse {
@@ -831,11 +871,12 @@ html, body {
   display: flex;
   align-items: flex-end;
   height: 16px;
-  gap: 2px;
+  gap: 3px;
+  margin: 0 4px;
 }
 
 .signal-bar {
-  width: 3px;
+  width: 4px;
   background-color: #ddd;
   border-radius: 1px;
 }
@@ -949,12 +990,15 @@ html, body {
   background: white;
   border-radius: 8px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  z-index: 1000;
+  z-index: 1100;
   transition: all 0.4s cubic-bezier(0.2, 0, 0.2, 1);
   display: flex;
   flex-direction: column;
-  touch-action: pan-y;
   isolation: isolate;
+  pointer-events: auto;
+  transform: translate3d(0, 0, 0);
+  -webkit-transform: translate3d(0, 0, 0);
+  will-change: transform;
 }
 
 .routing-directions-container.collapsed {
@@ -979,6 +1023,9 @@ html, body {
   justify-content: space-between;
   align-items: center;
   min-height: 50px;
+  flex-shrink: 0;
+  z-index: 2;
+  position: relative;
 }
 
 .minimized .routing-directions-header {
@@ -1051,18 +1098,27 @@ html, body {
 
 .routing-directions-content {
   padding: 15px;
-  overflow-y: auto;
-  max-height: calc(70vh - 110px);
-  overscroll-behavior: contain;
+  overflow-y: auto !important; /* Force scrolling to be active */
+  overflow-x: hidden;
+  height: calc(70vh - 110px);
+  max-height: none; /* Remove max-height constraint */
+  flex-grow: 1;
   scrollbar-width: thin;
   scrollbar-color: rgba(0, 0, 0, 0.4) transparent;
-  touch-action: pan-y;
-  -webkit-overflow-scrolling: touch;
-  will-change: scroll-position;
+  position: relative;
+  z-index: 1;
+  overscroll-behavior: contain !important;
+  touch-action: pan-y !important; /* Allow vertical scrolling on touch */
+  pointer-events: auto !important; /* Ensure clicks work on content */
+  -webkit-overflow-scrolling: touch !important; /* Smooth scrolling on iOS */
+  transform: translateZ(0); /* Force GPU acceleration */
+  contain: content; /* Improve scrolling performance */
 }
 
 .routing-directions-content::-webkit-scrollbar {
-  width: 8px;
+  width: 10px;
+  background-color: #f1f1f1;
+  border-radius: 5px;
 }
 
 .routing-directions-content::-webkit-scrollbar-track {
@@ -1072,21 +1128,38 @@ html, body {
 }
 
 .routing-directions-content::-webkit-scrollbar-thumb {
-  background-color: rgba(0, 0, 0, 0.3);
-  border-radius: 4px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background-color: #a8a8a8;
+  border-radius: 5px;
+  border: 2px solid #f1f1f1;
 }
 
 .routing-directions-content::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(0, 0, 0, 0.5);
+  background-color: #8a8a8a;
+}
+
+.routing-directions-content::-webkit-scrollbar-corner {
+  background-color: transparent;
 }
 
 .routing-summary {
-  margin-bottom: 15px;
-  padding-bottom: 15px;
-  border-bottom: 1px solid #e0e0e0;
-  display: flex;
-  justify-content: space-between;
+  padding: 10px 15px;
+  background-color: #f8f9fa;
+  border-bottom: 1px solid #e9ecef;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #343a40;
+}
+
+.custom-route-badge {
+  display: inline-block;
+  margin-top: 5px;
+  padding: 2px 8px;
+  background-color: #0F9D58;
+  color: white;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
 }
 
 .instruction-list {
@@ -1125,6 +1198,7 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
+  font-size: 16px;
 }
 
 .instruction-text {
@@ -1155,6 +1229,9 @@ html, body {
   border-top: 1px solid #e0e0e0;
   border-radius: 0 0 8px 8px;
   transition: background-color 0.3s ease;
+  flex-shrink: 0;
+  z-index: 2;
+  position: relative;
 }
 
 .routing-directions-collapse:hover {
@@ -1274,4 +1351,221 @@ html, body {
   height: 100%;
   background: linear-gradient(90deg, #ff4d4d 0%, #ffff4d 50%, #4dff4d 100%);
   transition: width 0.5s ease-out;
+}
+
+/* Route type selection modal */
+.route-type-selection-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1500;
+  animation: fadeIn 0.3s ease;
+}
+
+.route-type-selection-content {
+  width: 90%;
+  max-width: 500px;
+  background: white;
+  border-radius: 16px;
+  padding: 25px;
+  box-shadow: 0 5px 30px rgba(0, 0, 0, 0.3);
+}
+
+.route-type-selection-content h3 {
+  margin-top: 0;
+  margin-bottom: 10px;
+  font-size: 20px;
+  color: #333;
+}
+
+.route-type-selection-content p {
+  margin-bottom: 20px;
+  color: #666;
+}
+
+/* Style for the route options info inside the modal */
+.route-options-info {
+  background-color: #f8f9fa;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 20px;
+  border: 1px solid #e0e0e0;
+}
+
+.route-options-info h5 {
+  margin-top: 0;
+  margin-bottom: 12px;
+  font-size: 16px;
+  color: #333;
+}
+
+.route-options-info ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.route-options-info li {
+  margin-bottom: 8px;
+  font-size: 14px;
+  color: #444;
+  line-height: 1.4;
+}
+
+.route-selection-options {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.route-selection-option {
+  display: flex;
+  align-items: center;
+  padding: 18px 16px;
+  background-color: #f8f9fa;
+  border: 1px solid #e0e0e0;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-align: left;
+}
+
+.route-selection-option:hover {
+  background-color: #e8f4ff;
+  transform: translateY(-2px);
+  border-color: #2A93EE;
+  box-shadow: 0 4px 12px rgba(42, 147, 238, 0.2);
+}
+
+.route-selection-icon {
+  font-size: 24px;
+  margin-right: 15px;
+  min-width: 30px;
+  text-align: center;
+}
+
+.route-selection-label {
+  font-weight: 600;
+  font-size: 16px;
+  color: #333;
+  flex: 1;
+}
+
+.route-selection-desc {
+  font-size: 14px;
+  color: #777;
+  margin-left: auto;
+}
+
+/* Style for route type button */
+.route-type-button {
+  font-size: 20px;
+  background-color: #fff;
+  transition: all 0.3s ease;
+}
+
+.route-type-button:hover {
+  background-color: #e8f4ff;
+  transform: scale(1.05);
+}
+
+/* Styling for the Change Route Type button */
+.change-route-type {
+  margin-top: 10px;
+  text-align: center;
+}
+
+.change-route-button {
+  padding: 8px 16px;
+  background-color: #2A93EE;
+  color: white;
+  border: none;
+  border-radius: 20px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.change-route-button:hover {
+  background-color: #1976d2;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* Additional styling for route selection modal */
+.route-selection-option.active {
+  background-color: #e8f4ff;
+  border-color: #2A93EE;
+  box-shadow: 0 4px 12px rgba(42, 147, 238, 0.2);
+}
+
+.route-selection-actions {
+  margin-top: 20px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.route-selection-cancel {
+  padding: 10px 20px;
+  background-color: #f5f5f5;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  color: #555;
+  font-size: 14px;
+}
+
+.route-selection-cancel:hover {
+  background-color: #e0e0e0;
+}
+
+/* Styling for "Don't ask again" toggle */
+.route-selection-dont-ask {
+  margin: 15px 0;
+  text-align: center;
+}
+
+.dont-ask-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  user-select: none;
+}
+
+.dont-ask-label input[type="checkbox"] {
+  margin-right: 8px;
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.dont-ask-text {
+  font-size: 14px;
+  color: #666;
+}
+
+/* When checkbox is checked, highlight the text */
+.dont-ask-label input[type="checkbox"]:checked + .dont-ask-text {
+  color: #3498db;
+  font-weight: 500;
+}
+
+/* Style for route selection options that are available */
+.route-selection-option.available {
+  box-shadow: 0 2px 10px rgba(0, 200, 0, 0.2);
+  border-color: #4CAF50;
+}
+
+.route-selection-option .calculating {
+  color: #888;
+  font-style: italic;
+  font-size: 12px;
 }
