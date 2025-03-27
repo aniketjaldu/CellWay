@@ -886,15 +886,15 @@ def get_route_cell_coverage(start_lat, start_lng, end_lat, end_lng):
         cell_data = get_cell_towers(lat_min, lng_min, lat_max, lng_max)
         towers = cell_data.get('towers', [])
         
-        # Use our custom routing algorithm with high signal weight (1)
-        return calculate_custom_route(start_lat, start_lng, end_lat, end_lng, towers=towers, signal_weight=1)
+        # Use our custom routing algorithm with high signal weight (0.8)
+        return calculate_custom_route(start_lat, start_lng, end_lat, end_lng, towers=towers, signal_weight=0.8)
     
     except Exception as e:
         print(f"Error in get_route_cell_coverage: {e}")
         # Fall back to OSRM routing
         return get_route_fastest(start_lat, start_lng, end_lat, end_lng)
 
-# Modify balanced route to use our custom router with a medium signal weight
+# Modify balanced route to use our custom router with a low signal weight
 def get_route_balanced(start_lat, start_lng, end_lat, end_lng):
     """Get a route balanced between speed and cell coverage using our custom routing algorithm"""
     try:
