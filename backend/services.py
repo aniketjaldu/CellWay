@@ -21,20 +21,21 @@ import logging
 
 # Helper function for Haversine distance calculation
 def haversine_distance(lat1, lon1, lat2, lon2):
-    """
-    Calculate the great circle distance between two points 
-    on the earth (specified in decimal degrees)
-    """
+    """Calculate the great circle distance between two points on earth in meters"""
+    # Earth radius in meters
+    earth_radius = 6371000
+    
     # Convert decimal degrees to radians
     lat1, lon1, lat2, lon2 = map(math.radians, [lat1, lon1, lat2, lon2])
     
     # Haversine formula
-    dlon = lon2 - lon1
     dlat = lat2 - lat1
+    dlon = lon2 - lon1
     a = math.sin(dlat/2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon/2)**2
     c = 2 * math.asin(math.sqrt(a))
-    r = 6371  # Radius of earth in kilometers
-    return c * r
+    
+    # Return distance in meters
+    return earth_radius * c
 
 # New function to calculate routes using GraphHopper
 def calculate_graphhopper_routes(start_lat, start_lng, end_lat, end_lng, alternatives=10):
@@ -52,22 +53,6 @@ def calculate_graphhopper_routes(start_lat, start_lng, end_lat, end_lng, alterna
     print(f"Calculating GraphHopper routes from ({start_lat}, {start_lng}) to ({end_lat}, {end_lng})")
     
     try:
-        # Calculate the distance between start and end points
-        distance_km = haversine_distance(start_lat, start_lng, end_lat, end_lng)
-        print(f"Direct distance between points: {distance_km:.2f} km")
-        
-        # Adjust number of alternatives based on distance
-        if distance_km < 5:  # Very short trips (< 5 km)
-            alternatives = 3
-        elif distance_km < 10:  # Short trips (5-10 km)
-            alternatives = 5
-        elif distance_km < 20:  # Medium trips (10-20 km)
-            alternatives = 7
-        else:  # Longer trips (> 20 km)
-            alternatives = 10
-            
-        print(f"Requesting {alternatives} route alternatives based on distance of {distance_km:.2f} km")
-        
         # GraphHopper API endpoint
         url = "https://graphhopper.com/api/1/route"
         

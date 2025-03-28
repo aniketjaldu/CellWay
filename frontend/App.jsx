@@ -21,7 +21,6 @@ function App() {
   const handleRegisterRef = useRef(null);
   const handleLogoutRef = useRef(null);
   const toggleAuthFormRef = useRef(null);
-  const toggleAuthOptionsRef = useRef(null); // New ref for auth options popup
   const toggleSavedRoutesRef = useRef(null);
   const loadSavedRouteRef = useRef(null);
   const toggleSearchRef = useRef(null);
@@ -93,20 +92,13 @@ function App() {
   // Authentication states
   const [user, setUser] = useState(null);
   const [showAuthForm, setShowAuthForm] = useState(false);
-  const [showAuthOptions, setShowAuthOptions] = useState(false);
-  const [authMode, setAuthMode] = useState('login'); // 'login' or 'register' or 'forgot'
+  const [authMode, setAuthMode] = useState('login'); // 'login' or 'register'
   const [authError, setAuthError] = useState('');
 
   // Form states
+  const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-
-  // Refs for password fields
-  const passwordInputRef = useRef(null);
-  const confirmPasswordInputRef = useRef(null);
 
   // Route type state
   const [routeType, setRouteType] = useState('fastest');
@@ -251,18 +243,15 @@ function App() {
   const handleRegister = async (e) => {
     e.preventDefault();
     setAuthError('');
-    if (!email || !password || !confirmPassword) {
+    if (!username || !email || !password) {
       setAuthError('All fields are required'); return;
     }
-    if (password !== confirmPassword) {
-      setAuthError('Passwords do not match'); return;
-    }
     try {
-      const response = await api.post('/register', { email, password, confirm_password: confirmPassword });
+      const response = await api.post('/register', { username, email, password });
       if (response.data.success) {
         setUser(response.data.user);
         setShowAuthForm(false);
-        setEmail(''); setPassword(''); setConfirmPassword('');
+        setUsername(''); setEmail(''); setPassword('');
       }
     } catch (error) {
       setAuthError(error.response?.data?.error || 'Registration failed');
@@ -281,79 +270,11 @@ function App() {
   };
   handleLogoutRef.current = handleLogout;
 
-  // Handle forgot password
-  const handleForgotPassword = async (e) => {
-    if (e) e.preventDefault();
-    
-    try {
-      setAuthError('');
-      
-      if (!email) {
-        setAuthError('Please enter your email address');
-        return;
-      }
-      
-      const response = await api.post('/forgot-password', { email });
-      
-      // Show success message
-      toast.success(response.data.message || 'Password reset link sent to your email');
-      
-      // For development/demo purposes only - would be removed in production
-      if (response.data.debug_token) {
-        console.log('Reset token (for development only):', response.data.debug_token);
-        // In a real app, this would be sent via email, not displayed to the user
-        toast.info(`For demo purposes only: ${response.data.debug_token}`);
-      }
-      
-      // Close the auth form
-      toggleAuthForm();
-      
-    } catch (error) {
-      console.error('Forgot password error:', error);
-      setAuthError(error.response?.data?.error || 'Failed to send reset link');
-    }
-  };
-
-  // Function to reset all form fields
-  const resetFormFields = () => {
-    setEmail('');
-    setPassword('');
-    setConfirmPassword('');
-    setShowPassword(false);
-    setShowConfirmPassword(false);
-    setAuthError('');
-  };
-
   // Toggle auth form
-  const toggleAuthForm = (mode = null) => {
-    if (mode) {
-      setAuthMode(mode);
-    }
-    if (showAuthForm) {
-      setShowAuthForm(false);
-      resetFormFields();
-    } else {
-      setShowAuthForm(true);
-    }
-    setShowAuthOptions(false);
-    setAuthError('');
+  const toggleAuthForm = () => {
+    setShowAuthForm(prev => !prev); setAuthError('');
   };
   toggleAuthFormRef.current = toggleAuthForm;
-
-  // Toggle auth options popup
-  const toggleAuthOptions = () => {
-    if (showAuthOptions) {
-      setShowAuthOptions(false);
-    } else {
-      setShowAuthOptions(true);
-    }
-    // If we're hiding the auth form, reset fields
-    if (showAuthForm) {
-      setShowAuthForm(false);
-      resetFormFields();
-    }
-  };
-  toggleAuthOptionsRef.current = toggleAuthOptions;
 
   // Toggle saved routes
   const toggleSavedRoutes = () => {
@@ -389,19 +310,14 @@ function App() {
     const mapInstance = L.map(mapRef.current).setView([42.336687, -71.095762], 13);
     L.tileLayer('https://api.maptiler.com/maps/dataviz/{z}/{x}/{y}.png?key=' + mapTilerKey, {
       attribution: '<a href="https://www.maptiler.com/copyright/" target="_blank"> MapTiler</a> <a href="https://www.openstreetmap.org/copyright" target="_blank"> OpenStreetMap contributors</a>',
-      tileSize: 512, zoomOffset: -1, minZoom: 4
+      tileSize: 512, zoomOffset: -1, minZoom: 3
     }).addTo(mapInstance);
 
     setMap(mapInstance);
     if (!currentRoutePoints) setCurrentRoutePoints({ start: null, end: null });
     if (!allTowers.current) allTowers.current = [];
 
-    // Make sure the map is fully initialized before invalidating size
-    setTimeout(() => {
-      if (mapInstance && mapInstance._container) {
-        mapInstance.invalidateSize();
-      }
-    }, 100);
+    setTimeout(() => mapInstance.invalidateSize(), 100);
 
     return () => {
         mapInstance.remove();
@@ -726,7 +642,7 @@ function App() {
   updateMapViewRef.current = updateMapView;
 
   // Helper function to calculate routes with direct point parameters
-  const calculateRouteWithPoints = async (routePoints) => {
+  const calculateRouteWithPoints = (routePoints) => {
     console.log("CALCULATE WITH POINTS:", routePoints);
     
     // Critical validation - ensure we have valid route points
@@ -738,6 +654,14 @@ function App() {
       window._routeCalcStartTime = null;
       return;
     }
+    
+    // Call the real calculation function with the points
+    calculateAllRouteTypesWithPoints(routePoints);
+  };
+
+  // Modified calculate function that takes points parameter
+  const calculateAllRouteTypesWithPoints = async (points) => {
+    console.log("CALCULATE: Starting route calculation with:", points);
     
     // Note: We're intentionally NOT checking routesAreLoading here to avoid getting stuck
     console.log("CALCULATE: Proceeding with route calculation regardless of previous state");
@@ -759,10 +683,10 @@ function App() {
       
       // Request fastest route first (will generate all 10 routes on the backend)
       const fastestRouteResult = await calculateRouteRef.current?.(
-        routePoints.start.lat,
-        routePoints.start.lng,
-        routePoints.end.lat,
-        routePoints.end.lng,
+        points.start.lat,
+        points.start.lng,
+        points.end.lat,
+        points.end.lng,
         'fastest'
       );
       
@@ -789,10 +713,10 @@ function App() {
       // Calculate other route types in parallel
       const [cellCoverageResult, balancedResult] = await Promise.all([
         calculateRouteRef.current?.(
-          routePoints.start.lat,
-          routePoints.start.lng,
-          routePoints.end.lat,
-          routePoints.end.lng,
+          points.start.lat,
+          points.start.lng,
+          points.end.lat,
+          points.end.lng,
           'cell_coverage'
         ).catch(err => {
           console.error("Error calculating cell coverage route:", err);
@@ -800,10 +724,10 @@ function App() {
         }),
         
         calculateRouteRef.current?.(
-          routePoints.start.lat,
-          routePoints.start.lng,
-          routePoints.end.lat,
-          routePoints.end.lng,
+          points.start.lat,
+          points.start.lng,
+          points.end.lat,
+          points.end.lng,
           'balanced'
         ).catch(err => {
           console.error("Error calculating balanced route:", err);
@@ -1285,9 +1209,7 @@ function App() {
       descendFormatted: descendM > 0 ? `${Math.round(descendM)}m ↘️` : '',
       steps: formattedSteps,
       isGraphHopperRoute: true,
-      optimizationType: routeTypeArg || route.properties?.optimizationType || 'balanced',
-      origin: originValue,
-      destination: destinationValue
+      optimizationType: routeTypeArg || route.properties?.optimizationType || 'balanced'
     };
   };
   extractDirectionsRef.current = extractDirections;
@@ -1601,7 +1523,9 @@ function App() {
         currentRoutePoints.start.lng,
         currentRoutePoints.end.lat,
         currentRoutePoints.end.lng,
-        'fastest'
+        'fastest',
+        'osrm',
+        0
       );
       
       if (!fastestRouteResult?.route) {
@@ -1639,7 +1563,9 @@ function App() {
             currentRoutePoints.start.lng,
             currentRoutePoints.end.lat,
             currentRoutePoints.end.lng,
-            'cell_coverage'
+            'cell_coverage',
+            'custom',
+            0.8
           ).catch(err => {
             console.error("Error calculating cell coverage route:", err);
             return null;
@@ -1650,7 +1576,9 @@ function App() {
             currentRoutePoints.start.lng,
             currentRoutePoints.end.lat,
             currentRoutePoints.end.lng,
-            'balanced'
+            'balanced',
+            'custom',
+            0.5
           ).catch(err => {
             console.error("Error calculating balanced route:", err);
             return null;
@@ -2281,7 +2209,7 @@ function App() {
   useEffect(() => {
     if (!map) return;
     
-    const handleMapClick = (event) => {
+    const handleMapClick = (e) => {
       // Clear the step marker when clicking elsewhere on the map
       clearActiveStepMarker();
     };
@@ -2299,93 +2227,227 @@ function App() {
     }
   }, [isDirectionsMinimized, showDirections]);
 
+  // Add a direct document click handler to clear markers
+  useEffect(() => {
+    if (!document || !map) return;
+    
+    const documentClickHandler = (e) => {
+      // If click wasn't within the directions panel or on a step
+      if (!e.target.closest('.routing-directions-content') && 
+          !e.target.closest('.instruction-item')) {
+        clearActiveStepMarker();
+      }
+    };
+    
+    const mapClickHandler = () => {
+      clearActiveStepMarker();
+    };
+    
+    document.addEventListener('click', documentClickHandler);
+    map.on('click', mapClickHandler);
+    
+    return () => {
+      document.removeEventListener('click', documentClickHandler);
+      map.off('click', mapClickHandler);
+    };
+  }, [map]);
+
+  useEffect(() => {
+    if (isDirectionsMinimized || !showDirections) {
+      clearActiveStepMarker();
+    }
+  }, [isDirectionsMinimized, showDirections]);
+
   useEffect(() => { // Ensure directions panel state consistency
     if (showDirections && isDirectionsMinimized) setIsDirectionsMinimized(false);
   }, [showDirections]);
 
-  // Effect to handle clicking outside password fields
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      // Hide both passwords at once when clicking outside any password field
-      if (!event.target.closest('.password-input-container')) {
-        setShowPassword(false);
-        setShowConfirmPassword(false);
-      }
-    };
-
-    // Add event listener
-    document.addEventListener('mousedown', handleClickOutside);
+  // --- RouteTypeSelection Component (Inline) ---
+  const RouteTypeSelection = () => {
+    if (!showRouteTypeSelection) return null;
+    // Check if *any* route calculation is still ongoing OR if the overall process isn't marked as complete
+    const routesStillLoading = routesAreLoading || !allRoutesComputed;
     
-    // Clean up
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [showPassword, showConfirmPassword]);
-
-  // Effect to disable map controls when forms are open
-  useEffect(() => {
-    if (!map) return;
-    
-    // Check if any form or modal is open
-    const isAnyFormOpen = showAuthForm || showAuthOptions || showRouteTypeSelection || showSavedRoutes;
-    
-    try {
-      if (isAnyFormOpen) {
-        // Completely disable all map interactions
-        map.dragging.disable();
-        map.touchZoom.disable();
-        map.doubleClickZoom.disable();
-        map.scrollWheelZoom.disable();
-        map.boxZoom.disable();
-        map.keyboard.disable();
+    const handleRouteTypeSelect = (selectedType) => {
+      // If routes are still loading or calculation incomplete
+      if (routesStillLoading) {
+        console.log(`Selected ${selectedType} route, but calculation still in progress. Selection saved.`);
+        setRouteType(selectedType);
         
-        // Add a class to the map container for visual indication (optional)
-        const mapContainer = map.getContainer();
-        if (mapContainer) {
-          mapContainer.classList.add('map-disabled');
+        // If skip selection is enabled, save preference
+        if (skipRouteTypeSelection) {
+          localStorage.setItem('preferredRouteType', selectedType);
         }
-      } else {
-        // Re-enable all map interactions
-        map.dragging.enable();
-        map.touchZoom.enable();
-        map.doubleClickZoom.enable();
-        map.scrollWheelZoom.enable();
-        map.boxZoom.enable();
-        map.keyboard.enable();
         
-        // Remove the disabled class
-        const mapContainer = map.getContainer();
-        if (mapContainer) {
-          mapContainer.classList.remove('map-disabled');
+        // Hide the selection UI
+        setShowRouteTypeSelection(false);
+        
+        // If we have valid route points, force a recalculation with the new route type
+        if (currentRoutePoints?.start?.lat && currentRoutePoints?.start?.lng && 
+            currentRoutePoints?.end?.lat && currentRoutePoints?.end?.lng) {
+          
+          // Make a local copy to avoid state race conditions
+          const pointsToUse = {
+            start: { ...currentRoutePoints.start },
+            end: { ...currentRoutePoints.end }
+          };
+          
+          // Wait a moment for state updates to complete
+          setTimeout(() => {
+            console.log(`Forcing calculation with selected type: ${selectedType}`);
+            // Reset loading state if already calculating
+            if (routesAreLoading) {
+              setRoutesAreLoading(false);
+              setIsLoadingRoute(false);
+              window._routeCalcStartTime = null;
+              
+              // Short delay to ensure reset completes
+              setTimeout(() => {
+                setIsLoadingRoute(true);
+                setRoutesAreLoading(true);
+                window._routeCalcStartTime = Date.now();
+                calculateRouteWithPoints(pointsToUse);
+              }, 50);
+            } else {
+              // If not already calculating, start fresh
+              setIsLoadingRoute(true);
+              setRoutesAreLoading(true);
+              window._routeCalcStartTime = Date.now();
+              calculateRouteWithPoints(pointsToUse);
+            }
+          }, 100);
+        } else {
+          toast.error("Cannot recalculate - route points missing", { position: "top-center" });
         }
-      }
-    } catch (error) {
-      console.error("Error toggling map controls:", error);
-    }
-  }, [map, showAuthForm, showAuthOptions, showRouteTypeSelection, showSavedRoutes]);
-
-  // Close auth options popup when clicking outside
-  useEffect(() => {
-    if (!showAuthOptions) return;
-    
-    const handleClickOutside = (event) => {
-      // Don't close if clicking on the user icon button or within the popup
-      if (
-        event.target.closest('.user-icon-button') || 
-        event.target.closest('.auth-options-popup')
-      ) {
         return;
       }
+
+      // If we get here, we have completed route data
+      const selectedRouteData = computedRoutes[selectedType];
+
+      if (!selectedRouteData) {
+          console.error(`Error: handleRouteTypeSelect called for ${selectedType}, but route data is missing.`);
+          toast.error(`Could not display ${selectedType} route. Data missing.`, { position: "top-center" }); 
+          return; // Should not happen if button wasn't disabled
+      }
       
-      setShowAuthOptions(false);
+      setRouteType(selectedType); // Update state immediately
+      console.log(`Route type selected: ${selectedType}`);
+      if (skipRouteTypeSelection) localStorage.setItem('preferredRouteType', selectedType);
+      setShowRouteTypeSelection(false);
+      
+      console.log(`Displaying selected ${selectedType} route.`);
+      displayRouteRef.current?.(selectedRouteData, selectedType); // Display it
     };
     
-    document.addEventListener('click', handleClickOutside);
-    
-    return () => {
-      document.removeEventListener('click', handleClickOutside);
+    const handleDontAskAgainChange = (e) => {
+      const checked = e.target.checked;
+      setSkipRouteTypeSelection(checked);
+      localStorage.setItem('skipRouteTypeSelection', checked.toString());
+      if (checked) {
+        localStorage.setItem('preferredRouteType', routeType);
+      }
     };
-  }, [showAuthOptions]);
+    
+    // Render logic for the modal... (using refs for formatters)
+    return (
+      <div className="route-type-selection-overlay">
+        <div className="route-type-selection-content">
+          <h3>Choose Route Priority</h3>
+          <p>Select your preferred route optimization strategy</p>
+          
+          {/* Descriptions */}
+          <div className="route-options-info">
+            <h5>About Route Options</h5>
+            <ul>
+              <li><strong>Fastest:</strong> Quickest route to your destination</li>
+              <li><strong>Best Signal:</strong> Route with optimal cell tower coverage</li>
+              <li><strong>Balanced:</strong> Balance of speed and cell coverage</li>
+            </ul>
+          </div>
+          
+          {/* Loading Indicator - Shows if ANY route is still loading */}
+          {routesStillLoading && (
+            <div className="route-loading-indicator">
+                <p>
+                  Calculating routes...
+                  {/* More specific feedback (optional) */}
+                  {!computedRoutes.fastest && " (Fastest pending)"}
+                  {!computedRoutes.cell_coverage && " (Signal pending)"}
+                  {!computedRoutes.balanced && " (Balanced pending)"}
+              </p>
+            </div>
+          )}
+          
+          <div className="route-selection-options">
+              {/* Fastest Option */}
+            <button 
+              className={`route-selection-option ${routeType === 'fastest' ? 'active' : ''} ${computedRoutes.fastest ? 'available' : 'disabled'}`}
+              onClick={() => handleRouteTypeSelect('fastest')}
+              disabled={!computedRoutes.fastest}
+            >
+              <div className="route-selection-icon">⚡</div>
+              <div className="route-selection-label">Fastest</div>
+              <div className="route-selection-desc">
+                {computedRoutes.fastest ? (
+                  `${formatDistanceRef.current?.(computedRoutes.fastest.distance) || ''}, ${formatDurationRef.current?.(computedRoutes.fastest.duration) || ''}`
+                ) : (
+                  <span className="calculating">Calculating...</span>
+                )}
+              </div>
+            </button>
+            
+            {/* Cell Coverage Option */}
+            <button 
+              className={`route-selection-option ${routeType === 'cell_coverage' ? 'active' : ''} ${computedRoutes.cell_coverage ? 'available' : 'disabled'}`}
+              onClick={() => handleRouteTypeSelect('cell_coverage')}
+              disabled={!computedRoutes.cell_coverage}
+            >
+              <div className="route-selection-icon">📱</div>
+              <div className="route-selection-label">Best Signal</div>
+              <div className="route-selection-desc">
+                {computedRoutes.cell_coverage ? (
+                  `${formatDistanceRef.current?.(computedRoutes.cell_coverage.distance) || ''}, ${formatDurationRef.current?.(computedRoutes.cell_coverage.duration) || ''}`
+                ) : (
+                  <span className="calculating">Calculating...</span>
+                )}
+              </div>
+            </button>
+            
+            {/* Balanced Option */}
+            <button 
+              className={`route-selection-option ${routeType === 'balanced' ? 'active' : ''} ${computedRoutes.balanced ? 'available' : 'disabled'}`}
+              onClick={() => handleRouteTypeSelect('balanced')}
+              disabled={!computedRoutes.balanced}
+            >
+              <div className="route-selection-icon">⚖️</div>
+              <div className="route-selection-label">Balanced</div>
+              <div className="route-selection-desc">
+                {computedRoutes.balanced ? (
+                  `${formatDistanceRef.current?.(computedRoutes.balanced.distance) || ''}, ${formatDurationRef.current?.(computedRoutes.balanced.duration) || ''}`
+                ) : (
+                  <span className="calculating">Calculating...</span>
+                )}
+              </div>
+            </button>
+          </div>
+          
+            {/* Don't ask again Checkbox */}
+          <div className="route-selection-dont-ask">
+            <label className="dont-ask-label">
+                <input type="checkbox" checked={skipRouteTypeSelection} onChange={handleDontAskAgainChange} />
+              <span className="dont-ask-text">Don't ask again, always use selected type</span>
+            </label>
+          </div>
+          
+            {/* Cancel Button */}
+          <div className="route-selection-actions">
+              <button className="route-selection-cancel" onClick={() => setShowRouteTypeSelection(false)}>Cancel</button>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   // --- JSX Return ---
   return (
@@ -2406,12 +2468,10 @@ function App() {
               <button className="logout-button" onClick={() => handleLogoutRef.current?.()}>Logout</button>
             </>
           ) : (
-            <button className="login-button user-icon-button" onClick={() => toggleAuthOptionsRef.current?.()}>
-              <i className="fas fa-user"></i>
-            </button>
+            <button className="login-button" onClick={() => toggleAuthFormRef.current?.()}>Login / Register</button>
           )}
         </div>
-        
+          
         {/* Map Controls */}
           <div className="map-controls">
           {/* Existing zoom controls */}
@@ -2497,9 +2557,9 @@ function App() {
               {/* Header content */}
               <div className="routing-directions-title">
                 <div className="direction-endpoints">
-                   <span className="direction-origin">{routeDirections.origin || originValue}</span> 
+                   <span className="direction-origin">{originValue}</span> 
                    <span className="direction-separator">→</span> 
-                   <span className="direction-destination">{routeDirections.destination || destinationValue}</span>
+                   <span className="direction-destination">{destinationValue}</span>
                 </div>
               </div>
                <button className="routing-directions-close" onClick={() => setIsDirectionsMinimized(true)}>×</button>
@@ -2550,114 +2610,25 @@ function App() {
           </div>
         )}
         
-        {/* Auth Options Popup */}
-        {showAuthOptions && !user && (
-          <div className="auth-options-popup">
-            <div className="auth-options-content">
-              <button className="auth-option-button" onClick={() => toggleAuthFormRef.current?.('login')}>
-                <i className="fas fa-sign-in-alt"></i> Login
-              </button>
-              <button className="auth-option-button" onClick={() => toggleAuthFormRef.current?.('register')}>
-                <i className="fas fa-user-plus"></i> Register
-              </button>
-            </div>
-          </div>
-        )}
-        
         {/* Auth Form */}
         {showAuthForm && !user && (
           <div className="auth-form-container">
             <div className="auth-form">
               {/* Form content using refs for handlers */}
               <div className="auth-header">
-                <h2>{authMode === 'login' ? 'Login' : authMode === 'register' ? 'Register' : 'Forgot Password'}</h2>
+                <h2>{authMode === 'login' ? 'Login' : 'Register'}</h2>
                  <button className="close-button" onClick={() => toggleAuthFormRef.current?.()}>×</button>
               </div>
                {authError && <div className="auth-error">{authError}</div>}
-               <form onSubmit={authMode === 'login' ? handleLoginRef.current : authMode === 'register' ? handleRegisterRef.current : handleForgotPassword}>
+               <form onSubmit={authMode === 'login' ? handleLoginRef.current : handleRegisterRef.current}>
                  {/* Inputs */}
-                 {authMode === 'login' && <div className="form-group"><label htmlFor="email">Email</label><input type="email" id="email" value={email} onChange={(e) => setEmail(e.target.value)} required /></div>}
-                 {authMode === 'login' && <div className="form-group password-field">
-                   <label htmlFor="password">Password</label>
-                   <div className="password-input-container">
-                     <input 
-                       type={showPassword ? 'text' : 'password'} 
-                       id="password" 
-                       value={password} 
-                       onChange={(e) => setPassword(e.target.value)} 
-                       required 
-                       ref={passwordInputRef}
-                     />
-                     <button 
-                       type="button"
-                       className="password-toggle" 
-                       onClick={(e) => {
-                         e.preventDefault();
-                         setShowPassword(prev => !prev);
-                       }}
-                     >
-                       <i className={`fas ${showPassword ? 'fa-eye' : 'fa-eye-slash'}`}></i>
-                     </button>
-                   </div>
-                 </div>}
-                 {authMode === 'register' && <div className="form-group"><label htmlFor="email">Email</label><input type="email" id="email" value={email} onChange={(e) => setEmail(e.target.value)} required /></div>}
-                 {authMode === 'register' && <div className="form-group password-field">
-                   <label htmlFor="password">Password</label>
-                   <div className="password-input-container">
-                     <input 
-                       type={showPassword ? 'text' : 'password'} 
-                       id="password" 
-                       value={password} 
-                       onChange={(e) => setPassword(e.target.value)} 
-                       required 
-                       ref={passwordInputRef}
-                     />
-                     <button 
-                       type="button"
-                       className="password-toggle" 
-                       onClick={(e) => {
-                         e.preventDefault();
-                         setShowPassword(prev => !prev);
-                       }}
-                     >
-                       <i className={`fas ${showPassword ? 'fa-eye' : 'fa-eye-slash'}`}></i>
-                     </button>
-                   </div>
-                 </div>}
-                 {authMode === 'register' && <div className="form-group password-field">
-                   <label htmlFor="confirmPassword">Confirm Password</label>
-                   <div className="password-input-container">
-                     <input 
-                       type={showConfirmPassword ? 'text' : 'password'} 
-                       id="confirmPassword" 
-                       value={confirmPassword} 
-                       onChange={(e) => setConfirmPassword(e.target.value)} 
-                       required 
-                       ref={confirmPasswordInputRef}
-                     />
-                     <button 
-                       type="button"
-                       className="password-toggle" 
-                       onClick={(e) => {
-                         e.preventDefault();
-                         setShowConfirmPassword(prev => !prev);
-                       }}
-                     >
-                       <i className={`fas ${showConfirmPassword ? 'fa-eye' : 'fa-eye-slash'}`}></i>
-                     </button>
-                   </div>
-                 </div>}
-                 {authMode === 'forgot' && <div className="form-group"><label htmlFor="email">Email</label><input type="email" id="email" value={email} onChange={(e) => setEmail(e.target.value)} required /></div>}
+                 {authMode === 'register' && <div className="form-group"><label htmlFor="username">Username</label><input type="text" id="username" value={username} onChange={(e) => setUsername(e.target.value)} required /></div>}
+                 <div className="form-group"><label htmlFor="email">Email</label><input type="email" id="email" value={email} onChange={(e) => setEmail(e.target.value)} required /></div>
+                 <div className="form-group"><label htmlFor="password">Password</label><input type="password" id="password" value={password} onChange={(e) => setPassword(e.target.value)} required /></div>
                  {/* Actions & Switch */}
-                 <div className="form-actions"><button type="submit" className="submit-button">{authMode === 'login' ? 'Login' : authMode === 'register' ? 'Register' : 'Send Reset Link'}</button></div>
+                 <div className="form-actions"><button type="submit" className="submit-button">{authMode === 'login' ? 'Login' : 'Register'}</button></div>
                 <div className="auth-switch">
-                   {authMode === 'login' ? (
-                     <p>
-                       <button type="button" className="forgot-password-button" onClick={() => setAuthMode('forgot')}>Forgot Password?</button>
-                     </p>
-                   ) : (
-                     <p>Already have an account? <button type="button" onClick={() => setAuthMode('login')}>Login</button></p>
-                   )}
+                   {authMode === 'login' ? <p>Don't have an account? <button type="button" onClick={() => setAuthMode('register')}>Register</button></p> : <p>Already have an account? <button type="button" onClick={() => setAuthMode('login')}>Login</button></p>}
                 </div>
               </form>
             </div>
@@ -2789,29 +2760,17 @@ function App() {
                             end: { ...currentRoutePoints.end }
                           };
                           
-                          // Wait a moment for state updates to complete
+                          // Force recalculation with delay to ensure state updates
+                          toast.info("Manually recalculating routes...", { position: "top-center" });
+                          
                           setTimeout(() => {
-                            console.log(`Forcing calculation with selected type: ${selectedType}`);
-                            // Reset loading state if already calculating
-                            if (routesAreLoading) {
-                              setRoutesAreLoading(false);
-                              setIsLoadingRoute(false);
-                              window._routeCalcStartTime = null;
-                              
-                              // Short delay to ensure reset completes
-                              setTimeout(() => {
-                                setIsLoadingRoute(true);
-                                setRoutesAreLoading(true);
-                                window._routeCalcStartTime = Date.now();
-                                calculateRouteWithPoints(pointsToUse);
-                              }, 50);
-                            } else {
-                              // If not already calculating, start fresh
-                              setIsLoadingRoute(true);
-                              setRoutesAreLoading(true);
-                              window._routeCalcStartTime = Date.now();
-                              calculateRouteWithPoints(pointsToUse);
-                            }
+                            // Set loading state and start calculation
+                            setIsLoadingRoute(true);
+                            setRoutesAreLoading(true);
+                            window._routeCalcStartTime = Date.now();
+                            
+                            // Call calculation function directly with copied points
+                            calculateRouteWithPoints(pointsToUse);
                           }, 100);
                         } else {
                           toast.error("Cannot recalculate - route points missing", { position: "top-center" });

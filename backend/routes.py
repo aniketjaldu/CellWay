@@ -18,18 +18,14 @@ def login_required(f):
 def register():
     """Endpoint for user registration"""
     data = request.json
+    username = data.get('username')
     email = data.get('email')
     password = data.get('password')
-    confirm_password = data.get('confirm_password')
     
-    if not all([email, password, confirm_password]):
+    if not all([username, email, password]):
         return jsonify({'error': 'Missing required fields'}), 400
     
-    # Check if passwords match
-    if password != confirm_password:
-        return jsonify({'error': 'Passwords do not match'}), 400
-    
-    user, error = models.register_user(email, password)
+    user, error = models.register_user(username, email, password)
     if error:
         return jsonify({'error': error}), 400
     
@@ -68,98 +64,7 @@ def logout():
 def get_user():
     """Endpoint for getting the current user"""
     user_id = session.get('user_id')
-    user = models.get_user_by_id(user_id)
-    if not user:
-        session.pop('user_id', None)
-        return jsonify({'error': 'User not found'}), 404
-    return jsonify({'user': user})
-
-@api_bp.route('/user', methods=['PUT'])
-@login_required
-def update_user_profile():
-    """Endpoint for updating user profile"""
-    user_id = session.get('user_id')
-    data = request.json
-    
-    success = models.update_user(user_id, data)
-    if not success:
-        return jsonify({'error': 'Failed to update user'}), 400
-    
-    updated_user = models.get_user_by_id(user_id)
-    return jsonify({'user': updated_user})
-
-@api_bp.route('/change-password', methods=['POST'])
-@login_required
-def change_password():
-    """Endpoint for changing password"""
-    user_id = session.get('user_id')
-    data = request.json
-    current_password = data.get('current_password')
-    new_password = data.get('new_password')
-    
-    if not all([current_password, new_password]):
-        return jsonify({'error': 'Missing required fields'}), 400
-    
-    success, error = models.change_password(user_id, current_password, new_password)
-    if not success:
-        return jsonify({'error': error}), 400
-    
-    return jsonify({'success': True, 'message': 'Password changed successfully'})
-
-@api_bp.route('/forgot-password', methods=['POST'])
-def forgot_password():
-    """Endpoint for requesting password reset"""
-    data = request.json
-    email = data.get('email')
-    
-    if not email:
-        return jsonify({'error': 'Email is required'}), 400
-    
-    token_data, error = models.create_password_reset_token(email)
-    if error:
-        # Don't reveal if email exists for security
-        return jsonify({'success': True, 'message': 'If your email is registered, you will receive a password reset link'})
-    
-    # In a real application, you would send an email with the reset link
-    # For this implementation, we'll just return the token
-    # In production, NEVER return the token directly - always send via email
-    
-    return jsonify({
-        'success': True, 
-        'message': 'Password reset link sent',
-        'debug_token': token_data['token']  # Remove this in production
-    })
-
-@api_bp.route('/reset-password', methods=['POST'])
-def reset_password():
-    """Endpoint for resetting password with token"""
-    data = request.json
-    token = data.get('token')
-    new_password = data.get('new_password')
-    
-    if not all([token, new_password]):
-        return jsonify({'error': 'Missing required fields'}), 400
-    
-    success, error = models.reset_password_with_token(token, new_password)
-    if not success:
-        return jsonify({'error': error}), 400
-    
-    return jsonify({'success': True, 'message': 'Password reset successfully'})
-
-@api_bp.route('/verify-reset-token', methods=['POST'])
-def verify_token():
-    """Endpoint for verifying a password reset token"""
-    data = request.json
-    token = data.get('token')
-    
-    if not token:
-        return jsonify({'error': 'Token is required'}), 400
-    
-    user_data, error = models.verify_reset_token(token)
-    if error:
-        return jsonify({'error': error}), 400
-    
-    return jsonify({'success': True, 'user': user_data})
+    return jsonify({'user_id': user_id})
 
 @api_bp.route('/geocode', methods=['GET'])
 def geocode():
