@@ -112,9 +112,9 @@ def reverse_geocode():
 def get_route():
     """Endpoint for calculating routes"""
     try:
-        # First try to get individual parameters
+        # Extract and validate parameters with better error handling
         try:
-            # Extract and validate parameters with better error handling
+            # Extract and validate parameters
             start_lat = request.args.get('start_lat')
             start_lng = request.args.get('start_lng')
             end_lat = request.args.get('end_lat')
@@ -133,55 +133,27 @@ def get_route():
             except ValueError:
                 return jsonify({'error': 'Coordinates must be valid numbers'}), 400
                 
-            # Get optional route type (defaults to balanced)
+            # Get optimization type (defaults to balanced)
             route_type = request.args.get('route_type', 'balanced')
             if route_type not in ['fastest', 'cell_coverage', 'balanced']:
                 route_type = 'balanced'  # Default to balanced if invalid
-                
-            # Get optional algorithm type (defaults based on route_type)
-            algorithm = request.args.get('algorithm')
-            
-            # Get optional signal weight for custom algorithm (defaults based on route_type)
-            weight = request.args.get('weight')
-            if weight is not None:
-                try:
-                    weight = float(weight)
-                    # Ensure weight is between 0 and 1
-                    weight = max(0.0, min(1.0, weight))
-                except ValueError:
-                    weight = None  # Use default if invalid
             
             print(f"Calculating route from ({start_lat}, {start_lng}) to ({end_lat}, {end_lng})")
-            print(f"Route type: {route_type}, Algorithm: {algorithm}, Weight: {weight}")
+            print(f"Optimization type: {route_type}")
             
         except Exception as e:
             # Handle parameter parsing errors
             return jsonify({'error': f'Parameter error: {str(e)}'}), 400
         
-        # Get route based on the requested optimization type and algorithm
-        if algorithm == 'custom':
-            if route_type == 'cell_coverage':
-                # Use high signal weight if not specified
-                signal_weight = weight if weight is not None else 0.8
-                result = services.calculate_custom_route(start_lat, start_lng, end_lat, end_lng, signal_weight=signal_weight)
-            elif route_type == 'balanced':
-                # Use medium signal weight if not specified
-                signal_weight = weight if weight is not None else 0.5
-                result = services.calculate_custom_route(start_lat, start_lng, end_lat, end_lng, signal_weight=signal_weight)
-            else:  # fastest with custom algorithm (unusual, but supported)
-                # Use low signal weight if not specified
-                signal_weight = weight if weight is not None else 0.0
-                result = services.calculate_custom_route(start_lat, start_lng, end_lat, end_lng, signal_weight=signal_weight)
-        else:
-            # Use original OSRM-based algorithms
-            if route_type == 'cell_coverage':
-                result = services.get_route_cell_coverage(start_lat, start_lng, end_lat, end_lng)
-            elif route_type == 'fastest':
-                result = services.get_route_fastest(start_lat, start_lng, end_lat, end_lng)
-            else:  # balanced
-                result = services.get_route_balanced(start_lat, start_lng, end_lat, end_lng)
+        # Get route based on the requested optimization type
+        if route_type == 'cell_coverage':
+            result = services.get_route_cell_coverage(start_lat, start_lng, end_lat, end_lng)
+        elif route_type == 'fastest':
+            result = services.get_route_fastest(start_lat, start_lng, end_lat, end_lng)
+        else:  # balanced
+            result = services.get_route_balanced(start_lat, start_lng, end_lat, end_lng)
         
-        # If OSRM response has an error, handle it
+        # If response has an error, handle it
         if 'code' in result and result['code'] != 'Ok':
             return jsonify({'error': result.get('message', 'Route calculation failed')}), 400
             

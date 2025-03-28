@@ -6,8 +6,6 @@ import SearchIcon from './assets/svg/search-icon.svg';
 import CloseIcon from './assets/svg/close-icon.svg';
 import axios from 'axios';
 import { toast } from 'react-hot-toast';
-// Assuming 'L' is globally available from Leaflet script/import
-// import L from 'leaflet'; // Uncomment if you import Leaflet directly
 
 // Create axios instance with credentials support
 const api = axios.create({
@@ -49,12 +47,12 @@ function App() {
   const getDirectionIconRef = useRef(null);
   const highlightRouteSegmentRef = useRef(null);
   const formatDateRef = useRef(null);
-  const toggleDirectionsCollapseRef = useRef(null);
   const toggleDirectionsRef = useRef(null);
   const cleanupAnimationRef = useRef(null);
   const clearRouteDisplayRef = useRef(null);
   const getRouteLineColorRef = useRef(null);
   const handleClearInputRef = useRef(null);
+  const handleLocateRef = useRef(null); // New ref for locate functionality
   // --- End Refs for Functions ---
 
   // Map references
@@ -82,6 +80,7 @@ function App() {
   const [searchExpanded, setSearchExpanded] = useState(true);
   const [routeInfo, setRouteInfo] = useState(null);
   const [isLoadingRoute, setIsLoadingRoute] = useState(false);
+  const [isLocating, setIsLocating] = useState(false); // New state for locate functionality
   
   // Routing state
   // const [routeControl, setRouteControl] = useState(null); // Not strictly needed if using ref
@@ -127,16 +126,12 @@ function App() {
   // State for routing directions
   const [showDirections, setShowDirections] = useState(false);
   const [routeDirections, setRouteDirections] = useState(null);
-  const [isDirectionsCollapsed, setIsDirectionsCollapsed] = useState(false);
   const [isDirectionsMinimized, setIsDirectionsMinimized] = useState(false);
   const [activeDirectionStep, setActiveDirectionStep] = useState(null);
   const [activeStepMarker, setActiveStepMarker] = useState(null);
 
   // Add a reference for the directions panel content
   const directionsContentRef = useRef(null);
-
-  // Add this near the top of the component to store cached routes
-  const [routeCache, setRouteCache] = useState({});
 
   // Route type selection state
   const [showRouteTypeSelection, setShowRouteTypeSelection] = useState(false);
@@ -314,7 +309,7 @@ function App() {
     
     const mapInstance = L.map(mapRef.current).setView([42.336687, -71.095762], 13);
     L.tileLayer('https://api.maptiler.com/maps/dataviz/{z}/{x}/{y}.png?key=' + mapTilerKey, {
-      attribution: '<a href="https://www.maptiler.com/copyright/" target="_blank">© MapTiler</a> <a href="https://www.openstreetmap.org/copyright" target="_blank">© OpenStreetMap contributors</a>',
+      attribution: '<a href="https://www.maptiler.com/copyright/" target="_blank"> MapTiler</a> <a href="https://www.openstreetmap.org/copyright" target="_blank"> OpenStreetMap contributors</a>',
       tileSize: 512, zoomOffset: -1, minZoom: 3
     }).addTo(mapInstance);
 
@@ -365,37 +360,6 @@ function App() {
   const fetchCellTowers = useCallback(async (bounds) => {
     if (!map) return []; // Return empty array if map not ready
     
-    // Generate a cache key based on the bounds (rounded to reduce variations)
-    const roundedBounds = {
-      min_lat: Math.floor(bounds.min_lat * 100) / 100,
-      min_lng: Math.floor(bounds.min_lng * 100) / 100,
-      max_lat: Math.ceil(bounds.max_lat * 100) / 100,
-      max_lng: Math.ceil(bounds.max_lng * 100) / 100
-    };
-    
-    const boundsKey = `${roundedBounds.min_lat},${roundedBounds.min_lng},${roundedBounds.max_lat},${roundedBounds.max_lng}`;
-    const cacheKey = `tower_cache_${boundsKey}`;
-    
-    // Check for cached data first
-    const cachedData = localStorage.getItem(cacheKey);
-    if (cachedData) {
-      try {
-        const parsed = JSON.parse(cachedData);
-        // Check if cache is still valid (less than 30 minutes old)
-        if (parsed.timestamp && (Date.now() - parsed.timestamp < 30 * 60 * 1000)) {
-          console.log(`Using ${parsed.towers.length} cached towers from storage`);
-          allTowers.current = parsed.towers;
-          return parsed.towers;
-        } else {
-          console.log("Tower cache expired, fetching fresh data");
-          localStorage.removeItem(cacheKey);
-        }
-      } catch (err) {
-        console.warn("Error parsing cached tower data", err);
-        localStorage.removeItem(cacheKey);
-      }
-    }
-    
     try {
       let { min_lat, min_lng, max_lat, max_lng } = bounds;
       console.log(`Fetching cell towers in area: ${min_lat},${min_lng},${max_lat},${max_lng}`);
@@ -415,17 +379,7 @@ function App() {
       console.log(`Received ${towers.length} cell towers from the backend`);
       
       if (towers.length > 0) {
-        // Cache the tower data for future use
-        try {
-          localStorage.setItem(cacheKey, JSON.stringify({
-            towers: towers,
-            timestamp: Date.now(),
-            bounds: roundedBounds
-          }));
-        } catch (cacheErr) {
-          console.warn("Could not cache tower data", cacheErr);
-        }
-        
+        // No caching - just use the towers directly
         allTowers.current = towers; // Update the main tower store
         
         // Show success message
@@ -453,6 +407,19 @@ function App() {
   fetchCellTowersRef.current = fetchCellTowers;
 
   // Handle Input Change Function
+  const preventMapInteraction = (event) => {
+    event.stopPropagation();
+    // Prevent map zoom/pan when scrolling within our components
+    const mapContainer = document.querySelector('.mapboxgl-map');
+    if (mapContainer) {
+      mapContainer.style.pointerEvents = 'none';
+      clearTimeout(window.mapPointerTimer);
+      window.mapPointerTimer = setTimeout(() => {
+        mapContainer.style.pointerEvents = 'auto';
+      }, 1000);
+    }
+  };
+
   const handleInputChange = useCallback(async (e, isOrigin) => {
     const value = e.target.value;
     const setSuggestions = isOrigin ? setOriginSuggestions : setDestinationSuggestions;
@@ -581,7 +548,8 @@ function App() {
         max_lng: Math.max(originLL.lng, destLL.lng) + waypointPadding
       };
       await fetchCellTowersRef.current?.(initialBounds);
-      setShowCellTowers(true);
+      // Removed automatic enabling of cell towers
+      // setShowCellTowers(true);
 
       // Show route type selection if not skipping
       if (!skipRouteTypeSelection) {
@@ -708,233 +676,101 @@ function App() {
     setIsLoadingRoute(true);
     setAllRoutesComputed(false);
     
-    // Check for cached routes
-    const cacheKey = `${points.start.lat},${points.start.lng}|${points.end.lat},${points.end.lng}`;
-    const cachedResult = localStorage.getItem(`route_cache_${cacheKey}`);
-    
-    if (cachedResult) {
-      try {
-        const parsed = JSON.parse(cachedResult);
-        console.log("CALCULATE: Using cached route data");
-        setComputedRoutes(parsed.routes);
-        setComputedRouteTowers(parsed.towers);
-        setAllRoutes([parsed.routes.fastest, parsed.routes.cell_coverage, parsed.routes.balanced]);
-        
-        // Display the route that matches the current selection
-        if (routeType === 'fastest') {
-          displayRouteRef.current?.(parsed.routes.fastest, 'fastest');
-        } else if (routeType === 'cell_coverage') {
-          displayRouteRef.current?.(parsed.routes.cell_coverage, 'cell_coverage');
-        } else if (routeType === 'balanced') {
-          displayRouteRef.current?.(parsed.routes.balanced, 'balanced');
-        }
-        
-        // Clear loading state
-        setAllRoutesComputed(true);
-        setRoutesAreLoading(false);
-        setIsLoadingRoute(false);
-        window._routeCalcStartTime = null;
-        console.log("CALCULATE: Completed from cache");
-        return;
-      } catch (err) {
-        console.error("Error parsing cached routes, recalculating", err);
-        localStorage.removeItem(`route_cache_${cacheKey}`);
-      }
-    }
-    
+    // No caching - always calculate fresh routes
     try {
       console.time('routeCalculation');
-      console.log("CALCULATE: Requesting fastest route from backend");
+      console.log("CALCULATE: Requesting routes from GraphHopper API");
       
-      // Request fastest route first
+      // Request fastest route first (will generate all 10 routes on the backend)
       const fastestRouteResult = await calculateRouteRef.current?.(
         points.start.lat,
         points.start.lng,
         points.end.lat,
         points.end.lng,
-        'fastest',
-        'osrm',
-        0
+        'fastest'
       );
       
       if (!fastestRouteResult?.route) {
-        throw new Error('Failed to calculate fastest route');
+        throw new Error('Failed to calculate routes');
       }
       
       console.log("CALCULATE: Got fastest route successfully");
       
-      // Determine if custom routing or OSRM alternatives
-      const isCustomRoutingEnabled = fastestRouteResult.route.custom_route !== undefined;
-      console.log(`CALCULATE: Using ${isCustomRoutingEnabled ? 'custom routing' : 'OSRM alternatives'}`);
+      // Get the fastest route data
+      const fastestRouteData = fastestRouteResult.route;
+      const fastestTowers = fastestRouteResult.towers;
       
-      let fastestRouteData, cellCoverageRouteData, balancedRouteData;
-      let fastestTowers, cellCoverageTowers, balancedTowers;
+      // Update UI with fastest route immediately for responsive feedback
+      setComputedRoutes(prev => ({ ...prev, fastest: fastestRouteData }));
+      setComputedRouteTowers(prev => ({ ...prev, fastest: fastestTowers }));
       
-      if (isCustomRoutingEnabled) {
-        // CUSTOM ROUTING MODE
-        fastestRouteData = fastestRouteResult.route;
-        fastestTowers = fastestRouteResult.towers;
+      if (routeType === 'fastest') {
+        displayRouteRef.current?.(fastestRouteData, 'fastest');
+      }
+      
+      console.log("CALCULATE: Requesting cell coverage and balanced routes");
+      
+      // Calculate other route types in parallel
+      const [cellCoverageResult, balancedResult] = await Promise.all([
+        calculateRouteRef.current?.(
+          points.start.lat,
+          points.start.lng,
+          points.end.lat,
+          points.end.lng,
+          'cell_coverage'
+        ).catch(err => {
+          console.error("Error calculating cell coverage route:", err);
+          return null;
+        }),
         
-        // Update UI with fastest route immediately for responsive feedback
-        setComputedRoutes(prev => ({ ...prev, fastest: fastestRouteData }));
-        setComputedRouteTowers(prev => ({ ...prev, fastest: fastestTowers }));
+        calculateRouteRef.current?.(
+          points.start.lat,
+          points.start.lng,
+          points.end.lat,
+          points.end.lng,
+          'balanced'
+        ).catch(err => {
+          console.error("Error calculating balanced route:", err);
+          return null;
+        })
+      ]);
+      
+      // Process cell coverage route if available
+      let cellCoverageRouteData, cellCoverageTowers;
+      if (cellCoverageResult?.route) {
+        cellCoverageRouteData = cellCoverageResult.route;
+        cellCoverageTowers = cellCoverageResult.towers;
         
-        if (routeType === 'fastest') {
-          displayRouteRef.current?.(fastestRouteData, 'fastest');
-        }
+        setComputedRoutes(prev => ({ ...prev, cell_coverage: cellCoverageRouteData }));
+        setComputedRouteTowers(prev => ({ ...prev, cell_coverage: cellCoverageTowers }));
         
-        console.log("CALCULATE: Requesting cell coverage and balanced routes in parallel");
-        
-        // Calculate other route types in parallel
-        const [cellCoverageResult, balancedResult] = await Promise.all([
-          calculateRouteRef.current?.(
-            points.start.lat,
-            points.start.lng,
-            points.end.lat,
-            points.end.lng,
-            'cell_coverage',
-            'custom',
-            0.8
-          ).catch(err => {
-            console.error("Error calculating cell coverage route:", err);
-            return null;
-          }),
-          
-          calculateRouteRef.current?.(
-            points.start.lat,
-            points.start.lng,
-            points.end.lat,
-            points.end.lng,
-            'balanced',
-            'custom',
-            0.5
-          ).catch(err => {
-            console.error("Error calculating balanced route:", err);
-            return null;
-          })
-        ]);
-        
-        // Process cell coverage route if available
-        if (cellCoverageResult?.route) {
-          cellCoverageRouteData = cellCoverageResult.route;
-          cellCoverageTowers = cellCoverageResult.towers;
-          
-          setComputedRoutes(prev => ({ ...prev, cell_coverage: cellCoverageRouteData }));
-          setComputedRouteTowers(prev => ({ ...prev, cell_coverage: cellCoverageTowers }));
-          
-          if (routeType === 'cell_coverage') {
-            displayRouteRef.current?.(cellCoverageRouteData, 'cell_coverage');
-          }
-        } else {
-          // Fallback to fastest if cell coverage calculation failed
-          cellCoverageRouteData = fastestRouteData;
-          cellCoverageTowers = fastestTowers;
-          console.warn("Cell coverage route calculation failed, using fastest route as fallback");
-        }
-        
-        // Process balanced route if available
-        if (balancedResult?.route) {
-          balancedRouteData = balancedResult.route;
-          balancedTowers = balancedResult.towers;
-          
-          setComputedRoutes(prev => ({ ...prev, balanced: balancedRouteData }));
-          setComputedRouteTowers(prev => ({ ...prev, balanced: balancedTowers }));
-          
-          if (routeType === 'balanced') {
-            displayRouteRef.current?.(balancedRouteData, 'balanced');
-          }
-        } else {
-          // Fallback to fastest if balanced calculation failed
-          balancedRouteData = fastestRouteData;
-          balancedTowers = fastestTowers;
-          console.warn("Balanced route calculation failed, using fastest route as fallback");
+        if (routeType === 'cell_coverage') {
+          displayRouteRef.current?.(cellCoverageRouteData, 'cell_coverage');
         }
       } else {
-        // OSRM ALTERNATIVES MODE
-        console.log("CALCULATE: Processing OSRM alternatives");
+        // Fallback to fastest if cell coverage calculation failed
+        cellCoverageRouteData = fastestRouteData;
+        cellCoverageTowers = fastestTowers;
+        console.warn("Cell coverage route calculation failed, using fastest route as fallback");
+      }
+      
+      // Process balanced route if available
+      let balancedRouteData, balancedTowers;
+      if (balancedResult?.route) {
+        balancedRouteData = balancedResult.route;
+        balancedTowers = balancedResult.towers;
         
-        const routes = fastestRouteResult.route.routes || [];
-        console.log(`CALCULATE: OSRM returned ${routes.length} alternative routes`);
+        setComputedRoutes(prev => ({ ...prev, balanced: balancedRouteData }));
+        setComputedRouteTowers(prev => ({ ...prev, balanced: balancedTowers }));
         
-        if (routes.length === 0) {
-          throw new Error('No routes returned from OSRM');
-        }
-        
-        // Calculate towers along each alternative route
-        console.log("CALCULATE: Finding towers along each alternative route");
-        const routesWithTowers = await Promise.all(routes.map(async (route, index) => {
-          const geometry = route.geometry || {};
-          const towers = findTowersAlongRouteRef.current?.(allTowers.current, geometry, 1000) || [];
-          const signalScore = calculateSignalScoreRef.current?.(towers);
-          
-          return {
-            route: route,
-            index: index,
-            towers: towers,
-            signalScore: signalScore || 0,
-            distance: route.distance,
-            duration: route.duration,
-            balancedScore: (signalScore || 0) * 0.5 + (1 - (route.duration / (routes[0].duration * 1.5))) * 0.5
-          };
-        }));
-        
-        // Select best routes for each type
-        const fastestRoute = routes[0];
-        fastestTowers = routesWithTowers[0].towers;
-        
-        // Find best cell coverage route
-        const cellCoverageIndex = routesWithTowers.reduce(
-          (maxIndex, route, index) => route.signalScore > routesWithTowers[maxIndex].signalScore ? index : maxIndex,
-          0
-        );
-        const cellCoverageRoute = routes[cellCoverageIndex];
-        cellCoverageTowers = routesWithTowers[cellCoverageIndex].towers;
-        
-        // Find best balanced route
-        const balancedIndex = routesWithTowers.reduce(
-          (maxIndex, route, index) => route.balancedScore > routesWithTowers[maxIndex].balancedScore ? index : maxIndex,
-          0
-        );
-        const balancedRoute = routes[balancedIndex];
-        balancedTowers = routesWithTowers[balancedIndex].towers;
-        
-        console.log(`CALCULATE: Selected routes - Fastest: 0, Cell coverage: ${cellCoverageIndex}, Balanced: ${balancedIndex}`);
-        
-        // Create route data in consistent format
-        const createRouteData = (route, towers) => ({
-          routes: [route],
-          waypoints: fastestRouteResult.route.waypoints,
-          distance: route.distance,
-          duration: route.duration,
-          towers: towers
-        });
-        
-        // Create final route data objects
-        fastestRouteData = createRouteData(fastestRoute, fastestTowers);
-        cellCoverageRouteData = createRouteData(cellCoverageRoute, cellCoverageTowers);
-        balancedRouteData = createRouteData(balancedRoute, balancedTowers);
-        
-        // Update state all at once
-        setComputedRoutes({
-          fastest: fastestRouteData,
-          cell_coverage: cellCoverageRouteData,
-          balanced: balancedRouteData
-        });
-        
-        setComputedRouteTowers({
-          fastest: fastestTowers,
-          cell_coverage: cellCoverageTowers,
-          balanced: balancedTowers
-        });
-        
-        // Display route matching current selection
-        if (routeType === 'fastest') {
-          displayRouteRef.current?.(fastestRouteData, 'fastest');
-        } else if (routeType === 'cell_coverage') {
-          displayRouteRef.current?.(cellCoverageRouteData, 'cell_coverage');
-        } else if (routeType === 'balanced') {
+        if (routeType === 'balanced') {
           displayRouteRef.current?.(balancedRouteData, 'balanced');
         }
+      } else {
+        // Fallback to fastest if balanced calculation failed
+        balancedRouteData = fastestRouteData;
+        balancedTowers = fastestTowers;
+        console.warn("Balanced route calculation failed, using fastest route as fallback");
       }
       
       console.timeEnd('routeCalculation');
@@ -956,23 +792,7 @@ function App() {
       
       setAllRoutes(newAllRoutes);
       
-      // Cache routes for future use
-      try {
-        console.log("CALCULATE: Caching route data");
-        localStorage.setItem(`route_cache_${cacheKey}`, JSON.stringify({
-          routes: finalComputedRoutes,
-          towers: {
-            fastest: fastestTowers,
-            cell_coverage: cellCoverageTowers,
-            balanced: balancedTowers
-          },
-          timestamp: Date.now()
-        }));
-      } catch (cacheError) {
-        console.warn("Could not cache routes due to storage limitation", cacheError);
-      }
-      
-      // Final state updates
+      // No caching - just update state
       setAllRoutesComputed(true);
       setRoutesAreLoading(false);
       setIsLoadingRoute(false);
@@ -998,17 +818,17 @@ function App() {
   calculateAllRouteTypesRef.current = calculateRouteWithPoints;
 
   // Calculate Route Function (Calls Backend)
-  const calculateRoute = useCallback(async (startLat, startLng, endLat, endLng, routeType, algorithm = 'osrm', weight = 0) => {
+  const calculateRoute = useCallback(async (startLat, startLng, endLat, endLng, routeType) => {
     const validCoords = [startLat, startLng, endLat, endLng].map(c => Number(parseFloat(c).toFixed(6)));
     if (validCoords.some(isNaN)) {
       throw new Error(`Invalid coordinates: (${startLat}, ${startLng}) to (${endLat}, ${endLng})`);
     }
     const [validStartLat, validStartLng, validEndLat, validEndLng] = validCoords;
     
-    console.log(`Calculating ${routeType} route from (${validStartLat}, ${validStartLng}) to (${validEndLat}, ${validEndLng}) using ${algorithm}, weight: ${weight}`);
+    console.log(`Calculating ${routeType} route from (${validStartLat}, ${validStartLng}) to (${validEndLat}, ${validEndLng})`);
     try {
       const response = await api.get('/route', {
-        params: { start_lat: validStartLat, start_lng: validStartLng, end_lat: validEndLat, end_lng: validEndLng, route_type: routeType, algorithm: algorithm, weight: weight }
+        params: { start_lat: validStartLat, start_lng: validStartLng, end_lat: validEndLat, end_lng: validEndLng, route_type: routeType }
       });
       const data = response.data;
       console.log(`API Response for ${routeType} route:`, data);
@@ -1023,7 +843,7 @@ function App() {
           distance: route.distance,
           duration: route.duration
           },
-          towers: data.towers || [] // Towers returned by custom backend route
+          towers: data.towers || [] // Towers returned by backend route
         };
       } else {
         console.error(`Route ${routeType} calculation failed - Response data:`, data);
@@ -1188,25 +1008,210 @@ function App() {
   findTowersAlongRouteRef.current = findTowersAlongRoute;
 
   // Extract Directions Helper
-  const extractDirections = (routeData) => {
+  const extractDirections = (routeData, routeTypeArg) => {
     if (!routeData?.routes?.[0]) return null;
     const route = routeData.routes[0];
-    const steps = route.legs?.[0]?.steps || [];
+    const legs = route.legs || [];
     const distanceM = route.distance;
     const durationS = route.duration;
+    const ascendM = route.ascend || 0;
+    const descendM = route.descend || 0;
     
-    const formattedSteps = steps.map(step => ({
-      type: step.maneuver?.type || 'straight',
-      instruction: step.maneuver?.instruction || '',
-      distanceFormatted: formatDistanceRef.current?.(step.distance) || '', // Use meters
-      coordinates: step.maneuver?.location || step.geometry?.coordinates?.[0]
-    }));
+    let formattedSteps = [];
+    
+    // Helper function to capitalize first letter
+    const capitalize = (str) => {
+      if (!str) return '';
+      return str.charAt(0).toUpperCase() + str.slice(1);
+    };
+    
+    // Helper function to get a proper street name
+    const getStreetName = (name) => {
+      return name || '';
+    };
+    
+    // GraphHopper sign to maneuver type mapping
+    const signToManeuverType = (sign) => {
+      switch(sign) {
+        case -98: return 'uturn';      // U-turn without knowledge if left or right
+        case -8: return 'uturn-left';  // Left U-turn
+        case -7: return 'keep-left';   // Keep left
+        case -6: return 'exit-roundabout'; // Leave roundabout
+        case -3: return 'sharp-left';  // Turn sharp left
+        case -2: return 'left';        // Turn left
+        case -1: return 'slight-left'; // Turn slight left
+        case 0: return 'straight';     // Continue on street
+        case 1: return 'slight-right'; // Turn slight right
+        case 2: return 'right';        // Turn right
+        case 3: return 'sharp-right';  // Turn sharp right
+        case 4: return 'destination';  // Finish instruction
+        case 5: return 'via';          // Via point
+        case 6: return 'roundabout';   // Enter roundabout
+        case 7: return 'keep-right';   // Keep right
+        case 8: return 'uturn-right';  // Right U-turn
+        default: return 'straight';
+      }
+    };
+    
+    // Process each leg and its steps
+    legs.forEach((leg, legIndex) => {
+      const steps = leg.steps || [];
+      
+      // Add starting point for first leg
+      if (legIndex === 0 && steps.length > 0) {
+        formattedSteps.push({
+          type: 'start',
+          instruction: 'Start from ' + (originValue || 'origin'),
+          distanceFormatted: '',
+          coordinates: steps[0]?.geometry?.coordinates?.[0] || null
+        });
+      }
+      
+      // Process each step
+      steps.forEach((step, stepIndex) => {
+        // Skip steps with no maneuver
+        if (!step.maneuver) return;
+        
+        // Get maneuver details
+        const maneuver = step.maneuver || {};
+        const signCode = maneuver.type || 0;
+        let type = signToManeuverType(signCode);
+        let modifier = maneuver.modifier || '';
+        
+        // Build a better instruction
+        let instruction = '';
+        const name = getStreetName(step.name);
+        const distance = formatDistanceRef.current?.(step.distance) || '';
+        
+        // Use the text from GraphHopper if available, otherwise build our own
+        if (step.instruction_text && step.instruction_text.trim() !== '') {
+          instruction = step.instruction_text;
+        } else {
+          // Format the instruction based on maneuver type
+          if (type === 'straight' || type === 'continue') {
+            instruction = name ? `Continue on ${name}` : `Continue straight`;
+          } else if (['right', 'left', 'slight-right', 'slight-left', 'sharp-right', 'sharp-left'].includes(type)) {
+            instruction = name 
+              ? `${capitalize(type)} onto ${name}` 
+              : `${capitalize(type)}`;
+          } else if (type === 'roundabout') {
+            const exit = maneuver.exit_number || '1st';
+            instruction = name 
+              ? `At the roundabout, take the ${exit} exit onto ${name}` 
+              : `At the roundabout, take the ${exit} exit`;
+          } else if (type === 'exit-roundabout') {
+            instruction = name 
+              ? `Exit the roundabout onto ${name}` 
+              : `Exit the roundabout`;
+          } else if (type === 'keep-left' || type === 'keep-right') {
+            instruction = name 
+              ? `${capitalize(type.replace('-', ' '))} onto ${name}` 
+              : `${capitalize(type.replace('-', ' '))}`;
+          } else if (type === 'destination') {
+            instruction = `Arrive at ${destinationValue || 'destination'}`;
+          } else if (type === 'uturn' || type === 'uturn-left' || type === 'uturn-right') {
+            instruction = name 
+              ? `Make a U-turn onto ${name}` 
+              : `Make a U-turn`;
+          } else if (type === 'via') {
+            instruction = `Pass via point`;
+          } else {
+            // Use a generic instruction for other types
+            instruction = name 
+              ? `${capitalize(type.replace('-', ' '))} onto ${name}`.trim()
+              : `${capitalize(type.replace('-', ' '))}`.trim();
+          }
+        }
+        
+        // Ensure instruction starts with a capital letter
+        instruction = capitalize(instruction);
+        
+        // Add road details if available
+        let roadInfo = '';
+        if (step.road_class) {
+          roadInfo += `${capitalize(step.road_class)} `;
+        }
+        if (step.max_speed) {
+          roadInfo += `(max ${step.max_speed} km/h) `;
+        }
+        
+        // Add elevation info if available for significant climbs/descents
+        let elevationInfo = '';
+        if (step.ascend > 10 || step.descend > 10) {
+          if (step.ascend > 10) {
+            elevationInfo += `↗️ ${Math.round(step.ascend)}m `;
+          }
+          if (step.descend > 10) {
+            elevationInfo += `↘️ ${Math.round(step.descend)}m `;
+          }
+        }
+        
+        formattedSteps.push({
+          type: type,
+          instruction: instruction,
+          distanceFormatted: distance,
+          coordinates: step.geometry?.coordinates?.[0] || null,
+          streetName: name,
+          roadInfo: roadInfo.trim(),
+          elevationInfo: elevationInfo.trim(),
+          signCode: signCode,
+          exitNumber: maneuver.exit_number,
+          turnAngle: maneuver.turn_angle,
+          // Store the entire segment coordinates for highlighting
+          segmentCoordinates: step.geometry?.coordinates || []
+        });
+      });
+      
+      // Add destination point for last leg if needed
+      if (legIndex === legs.length - 1) {
+        // Check if the last formatted step is already a destination
+        const lastFormattedStep = formattedSteps[formattedSteps.length - 1];
+        
+        // Only add a destination step if the last one isn't already a destination
+        if (lastFormattedStep && lastFormattedStep.type !== 'destination') {
+          const lastStep = steps[steps.length - 1];
+          const lastCoord = lastStep?.geometry?.coordinates?.[lastStep.geometry.coordinates.length - 1];
+          
+          formattedSteps.push({
+            type: 'destination',
+            instruction: 'Arrive at ' + (destinationValue || 'destination'),
+            distanceFormatted: '',
+            coordinates: lastCoord || null
+          });
+        }
+      }
+    });
+    
+    // Ensure we have at least basic start/end steps if no other steps
+    if (formattedSteps.length === 0) {
+      if (route.geometry?.coordinates?.length >= 2) {
+        formattedSteps = [
+          {
+            type: 'start',
+            instruction: 'Start from ' + (originValue || 'origin'),
+            distanceFormatted: '',
+            coordinates: route.geometry.coordinates[0]
+          },
+          {
+            type: 'destination',
+            instruction: 'Arrive at ' + (destinationValue || 'destination'),
+            distanceFormatted: formatDistanceRef.current?.(distanceM) || '',
+            coordinates: route.geometry.coordinates[route.geometry.coordinates.length - 1]
+          }
+        ];
+      }
+    }
 
     return {
       distanceFormatted: formatDistanceRef.current?.(distanceM) || '',
       durationFormatted: formatDurationRef.current?.(durationS) || '',
+      ascendFormatted: ascendM > 0 ? `${Math.round(ascendM)}m ↗️` : '',
+      descendFormatted: descendM > 0 ? `${Math.round(descendM)}m ↘️` : '',
       steps: formattedSteps,
-      isCustomRoute: route.type !== 'fastest' // Or check for custom_route flag
+      isGraphHopperRoute: true,
+      optimizationType: routeTypeArg || route.properties?.optimizationType || 'balanced',
+      origin: originValue,
+      destination: destinationValue
     };
   };
   extractDirectionsRef.current = extractDirections;
@@ -1253,7 +1258,7 @@ function App() {
             setRouteDirections(directions);
             setShowDirections(true);
         setIsDirectionsMinimized(false); // Ensure directions are visible
-        setIsDirectionsCollapsed(false);
+        // Removed setIsDirectionsCollapsed(false);
       }
 
       // Trigger tower display update AFTER route is drawn
@@ -1476,6 +1481,7 @@ function App() {
     
     setAllRoutesComputed(true);
     setRoutesAreLoading(false);
+    setIsLoadingRoute(false);
     setCalculationAnimation(null); // Stop animation
 
   }, []); // Dependency: calculateSignalScoreRef
@@ -1508,40 +1514,7 @@ function App() {
     setIsLoadingRoute(true);
     setAllRoutesComputed(false);
     
-    // Check for cached routes
-    const cacheKey = `${currentRoutePoints.start.lat},${currentRoutePoints.start.lng}|${currentRoutePoints.end.lat},${currentRoutePoints.end.lng}`;
-    const cachedResult = localStorage.getItem(`route_cache_${cacheKey}`);
-    
-    if (cachedResult) {
-      try {
-        const parsed = JSON.parse(cachedResult);
-        console.log("CALCULATE: Using cached route data");
-        setComputedRoutes(parsed.routes);
-        setComputedRouteTowers(parsed.towers);
-        setAllRoutes([parsed.routes.fastest, parsed.routes.cell_coverage, parsed.routes.balanced]);
-        
-        // Display the route that matches the current selection
-        if (routeType === 'fastest') {
-          displayRouteRef.current?.(parsed.routes.fastest, 'fastest');
-        } else if (routeType === 'cell_coverage') {
-          displayRouteRef.current?.(parsed.routes.cell_coverage, 'cell_coverage');
-        } else if (routeType === 'balanced') {
-          displayRouteRef.current?.(parsed.routes.balanced, 'balanced');
-        }
-        
-        // Clear loading state
-        setAllRoutesComputed(true);
-        setRoutesAreLoading(false);
-        setIsLoadingRoute(false);
-        window._routeCalcStartTime = null;
-        console.log("CALCULATE: Completed from cache");
-        return;
-      } catch (err) {
-        console.error("Error parsing cached routes, recalculating", err);
-        localStorage.removeItem(`route_cache_${cacheKey}`);
-      }
-    }
-    
+    // No caching - always calculate fresh routes
     try {
       console.time('routeCalculation');
       console.log("CALCULATE: Requesting fastest route from backend");
@@ -1756,23 +1729,7 @@ function App() {
       
       setAllRoutes(newAllRoutes);
       
-      // Cache routes for future use
-      try {
-        console.log("CALCULATE: Caching route data");
-        localStorage.setItem(`route_cache_${cacheKey}`, JSON.stringify({
-          routes: finalComputedRoutes,
-          towers: {
-            fastest: fastestTowers,
-            cell_coverage: cellCoverageTowers,
-            balanced: balancedTowers
-          },
-          timestamp: Date.now()
-        }));
-      } catch (cacheError) {
-        console.warn("Could not cache routes due to storage limitation", cacheError);
-      }
-      
-      // Final state updates
+      // No caching - just update state
       setAllRoutesComputed(true);
       setRoutesAreLoading(false);
       setIsLoadingRoute(false);
@@ -1795,6 +1752,184 @@ function App() {
   };
   calculateAllRouteTypesRef.current = calculateAllRouteTypes;
 
+  // Handle Locate Function
+  const handleLocate = async () => {
+    if (!map) return;
+    
+    setIsLocating(true);
+    toast.loading('Getting your location...', { id: 'locate-toast' });
+
+    try {
+      if ('geolocation' in navigator) {
+        navigator.geolocation.getCurrentPosition(async (position) => {
+          const { latitude, longitude } = position.coords;
+          const latlng = L.latLng(latitude, longitude);
+          
+          try {
+            // Direct call to MapTiler API for reverse geocoding
+            const response = await fetch(
+              `https://api.maptiler.com/geocoding/${longitude},${latitude}.json?key=${mapTilerKey}`
+            );
+            const data = await response.json();
+            
+            let placeName;
+            if (data?.features && data.features.length > 0) {
+              // Get the most relevant result (first one)
+              const place = data.features[0];
+              placeName = place.place_name || `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+            } else {
+              placeName = `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+            }
+            
+            // Update origin field with the place name
+            setOriginValue(placeName);
+            
+            // Update origin marker and route point
+            updateMarkerRef.current?.(latlng, true);
+            setCurrentRoutePoints(prev => ({ ...prev, start: { lat: latitude, lng: longitude } }));
+            
+            // Update suggestions with current location
+            if (data?.features && data.features.length > 0) {
+              setOriginSuggestions([data.features[0]]);
+            } else {
+              // Create a synthetic suggestion for coordinates
+              const syntheticSuggestion = {
+                id: "current-location",
+                place_name: placeName,
+                center: [longitude, latitude],
+                place_type: ["current-location"],
+                text: "Current Location"
+              };
+              setOriginSuggestions([syntheticSuggestion]);
+            }
+            
+            // Check if destination is already set
+            if (currentRoutePoints?.end?.lat && currentRoutePoints?.end?.lng) {
+              // Both points are now set - update map view to show both markers
+              const destLL = L.latLng(currentRoutePoints.end.lat, currentRoutePoints.end.lng);
+              
+              // Clear any existing route and calculations
+              clearRouteDisplayRef.current?.();
+              setAllRoutesComputed(false);
+              setComputedRoutes({ fastest: null, cell_coverage: null, balanced: null });
+              setComputedRouteTowers({ fastest: null, cell_coverage: null, balanced: null });
+              setRoutesAreLoading(false);
+              setIsLoadingRoute(false);
+              setCalculationAnimation(null);
+              
+              // Fit map to both points
+              const bounds = L.latLngBounds([latlng, destLL]);
+              map.fitBounds(bounds, { padding: [60, 60], maxZoom: 15 });
+              
+              // Fetch towers between waypoints
+              console.log("Fetching towers between waypoints after locate...");
+              const waypointPadding = 0.02;
+              const initialBounds = {
+                min_lat: Math.min(latitude, currentRoutePoints.end.lat) - waypointPadding,
+                min_lng: Math.min(longitude, currentRoutePoints.end.lng) - waypointPadding,
+                max_lat: Math.max(latitude, currentRoutePoints.end.lat) + waypointPadding,
+                max_lng: Math.max(longitude, currentRoutePoints.end.lng) + waypointPadding
+              };
+              await fetchCellTowersRef.current?.(initialBounds);
+              
+              // Show route type selection if not skipping
+              if (!skipRouteTypeSelection) {
+                setShowRouteTypeSelection(true);
+              }
+              
+              // Trigger route calculation
+              updateMapViewRef.current?.(latlng, destLL);
+              setSearchExpanded(false);
+              
+              toast.success('Location found! Calculating routes...', { id: 'locate-toast' });
+            } else {
+              // Only origin is set, just fly to it
+              map.flyTo(latlng, Math.max(map.getZoom(), 14));
+              toast.success('Location found! Enter a destination to calculate routes.', { id: 'locate-toast' });
+            }
+          } catch (error) {
+            console.error('Reverse geocoding failed:', error);
+            // Fallback to coordinates
+            setOriginValue(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
+            updateMarkerRef.current?.(latlng, true);
+            setCurrentRoutePoints(prev => ({ ...prev, start: { lat: latitude, lng: longitude } }));
+            
+            // Update suggestions with current location coordinates
+            const syntheticSuggestion = {
+              id: "current-location",
+              place_name: `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
+              center: [longitude, latitude],
+              place_type: ["current-location"],
+              text: "Current Location"
+            };
+            setOriginSuggestions([syntheticSuggestion]);
+            
+            // Check if destination is already set
+            if (currentRoutePoints?.end?.lat && currentRoutePoints?.end?.lng) {
+              // Both points are now set - handle as above
+              const destLL = L.latLng(currentRoutePoints.end.lat, currentRoutePoints.end.lng);
+              
+              // Clear any existing route and calculations
+              clearRouteDisplayRef.current?.();
+              setAllRoutesComputed(false);
+              setComputedRoutes({ fastest: null, cell_coverage: null, balanced: null });
+              setComputedRouteTowers({ fastest: null, cell_coverage: null, balanced: null });
+              setRoutesAreLoading(false);
+              setIsLoadingRoute(false);
+              setCalculationAnimation(null);
+              
+              // Fit map to both points
+              const bounds = L.latLngBounds([latlng, destLL]);
+              map.fitBounds(bounds, { padding: [60, 60], maxZoom: 15 });
+              
+              // Fetch towers between waypoints
+              console.log("Fetching towers between waypoints after locate (fallback)...");
+              const waypointPadding = 0.02;
+              const initialBounds = {
+                min_lat: Math.min(latitude, currentRoutePoints.end.lat) - waypointPadding,
+                min_lng: Math.min(longitude, currentRoutePoints.end.lng) - waypointPadding,
+                max_lat: Math.max(latitude, currentRoutePoints.end.lat) + waypointPadding,
+                max_lng: Math.max(longitude, currentRoutePoints.end.lng) + waypointPadding
+              };
+              await fetchCellTowersRef.current?.(initialBounds);
+              
+              // Show route type selection if not skipping
+              if (!skipRouteTypeSelection) {
+                setShowRouteTypeSelection(true);
+              }
+              
+              // Trigger route calculation
+              updateMapViewRef.current?.(latlng, destLL);
+              setSearchExpanded(false);
+              
+              toast.success('Location coordinates found! Calculating routes...', { id: 'locate-toast' });
+            } else {
+              map.flyTo(latlng, Math.max(map.getZoom(), 14));
+              toast.success('Location coordinates found! Enter a destination to calculate routes.', { id: 'locate-toast' });
+            }
+          } finally {
+            setIsLocating(false);
+          }
+        }, (error) => {
+          console.error('Geolocation error:', error);
+          toast.error('Could not get your location. Please check your browser settings.', { id: 'locate-toast' });
+          setIsLocating(false);
+        }, {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0
+        });
+      } else {
+        toast.error('Geolocation is not supported by your browser.', { id: 'locate-toast' });
+        setIsLocating(false);
+      }
+    } catch (error) {
+      console.error('Location error:', error);
+      toast.error('Could not get your location.', { id: 'locate-toast' });
+      setIsLocating(false);
+    }
+  };
+  handleLocateRef.current = handleLocate;
 
   // --- Other Helper Functions ---
   const hasValidRoutePoints = () => !!(currentRoutePoints?.start?.lat && currentRoutePoints?.start?.lng && currentRoutePoints?.end?.lat && currentRoutePoints?.end?.lng);
@@ -1803,36 +1938,223 @@ function App() {
   const getRouteTypeIcon = (type) => ({ fastest: '⚡', cell_coverage: '📱', balanced: '⚖️' }[type] || '🚗');
   getRouteTypeIconRef.current = getRouteTypeIcon;
 
-  const getDirectionIcon = (type) => ({ turn: '↱', left: '↰', right: '↱', straight: '⬆️', uturn: '↩️', arrive: '🏁', depart: '🚩', roundabout: '🔄', rotary: '🔄', merge: '↘️', fork: '⑂', exit: '↴' }[type] || '•');
+  const getDirectionIcon = (type) => {
+    // Normalize the type for consistency
+    const normalizedType = type?.toLowerCase() || '';
+    
+    // Emoji mapping for different direction types
+    const iconMap = {
+      // Basic movements
+      'straight': '⬆️',
+      'continue': '⬆️',
+      
+      // Left turns
+      'left': '↰',
+      'slight-left': '↖️',
+      'sharp-left': '⬅️',
+      
+      // Right turns
+      'right': '↱',
+      'slight-right': '↗️',
+      'sharp-right': '➡️',
+      
+      // Special movements
+      'uturn': '⤵️',
+      'uturn-left': '↩️',
+      'uturn-right': '↪️',
+      'arrive': '🏁',
+      'destination': '📍',
+      'depart': '🚩',
+      'start': '🔵',
+      
+      // Roundabouts
+      'roundabout': '🔄',
+      'exit-roundabout': '⤴️',
+      'rotary': '🔃',
+      
+      // Lane guidance
+      'keep-left': '↖️',
+      'keep-right': '↗️',
+      
+      // Complex movements
+      'merge': '⤎',
+      'fork': '⋔',
+      'exit': '↴',
+      'ramp': '⤴️',
+      'enter': '↣',
+      'end-of-road': '🛑',
+      'via': '🔸',
+      
+      // Highway specific
+      'highway': '🛣️',
+      'motorway': '🛣️',
+      'ferry': '⛴️',
+      'bridge': '🌉',
+      'tunnel': '🚇',
+    };
+    
+    return iconMap[normalizedType] || '•';
+  };
   getDirectionIconRef.current = getDirectionIcon;
 
-  const highlightRouteSegment = (instruction, index) => {
-    if (!map || !instruction?.coordinates?.[0]) return;
-    if (activeStepMarker) map.removeLayer(activeStepMarker);
+  const highlightRouteSegment = (instruction, index, event) => {
+    if (!map) return;
+    
+    // Stop event propagation if provided
+    if (event) {
+      event.stopPropagation();
+    }
+    
+    // Always clear previous marker first
+    clearActiveStepMarker();
+    
+    // If we're clicking the same step again, just clear it and return
+    if (activeDirectionStep === index) {
+      setActiveDirectionStep(null);
+      return;
+    }
+    
+    // Update the active step index
     setActiveDirectionStep(index);
+    
     try {
-      let lat, lng;
-      if (Array.isArray(instruction.coordinates[0])) [lng, lat] = instruction.coordinates[0];
-      else if (instruction.coordinates[0].lat && instruction.coordinates[0].lng) { lat = instruction.coordinates[0].lat; lng = instruction.coordinates[0].lng; }
-      else return;
-
-      const iconHtml = `<div class="step-marker">${getDirectionIconRef.current?.(instruction.type) || '•'}</div>`;
-      const icon = L.divIcon({ html: iconHtml, className: '', iconSize: [30, 30], iconAnchor: [15, 15] });
-      const marker = L.marker([lat, lng], { icon }).addTo(map);
-      setActiveStepMarker(marker);
-      map.panTo([lat, lng]);
-    } catch (error) { console.error("Error highlighting route segment:", error); }
+      // Create a group to hold all the visualization elements
+      const group = L.layerGroup();
+      
+      // If we have segment coordinates, draw the entire segment
+      if (instruction.segmentCoordinates && instruction.segmentCoordinates.length > 1) {
+        // Convert GeoJSON coordinates [lng, lat] to Leaflet coordinates [lat, lng]
+        const latLngs = instruction.segmentCoordinates.map(coord => [coord[1], coord[0]]);
+        
+        // Draw the segment as a polyline
+        const segmentLine = L.polyline(latLngs, {
+          color: '#2A93EE',
+          weight: 6, opacity: 0.8
+        });
+        
+        group.addLayer(segmentLine);
+        
+        // Add markers at the start and end of the segment
+        if (latLngs.length > 0) {
+          // Start marker
+          const startPoint = latLngs[0];
+          const startMarker = L.circleMarker(startPoint, {
+            radius: 8,
+            color: '#2A93EE',
+            weight: 3,
+            opacity: 0.9,
+            fillColor: '#fff',
+            fillOpacity: 1
+          });
+          
+          // Add icon for the start marker
+          const startIconHtml = `<div class="step-marker-icon">${getDirectionIconRef.current?.(instruction.type) || '•'}</div>`;
+          const startIcon = L.divIcon({ 
+            html: startIconHtml, 
+            className: 'step-marker-container', 
+            iconSize: [24, 24], 
+            iconAnchor: [12, 12] 
+          });
+          const startIconMarker = L.marker(startPoint, { icon: startIcon, interactive: false });
+          
+          group.addLayer(startMarker);
+          group.addLayer(startIconMarker);
+          
+          // Calculate bounds to ensure we can see the entire segment
+          const bounds = L.latLngBounds(latLngs);
+          
+          // Add to map and store reference
+          group.addTo(map);
+          setActiveStepMarker(group);
+          
+          // Fit the map to show the entire segment with padding
+          map.fitBounds(bounds, { 
+            padding: [50, 50],
+            maxZoom: 18
+          });
+        }
+      } else if (instruction.coordinates) {
+        // Fall back to single point if no segment coordinates
+        let lat, lng;
+        if (Array.isArray(instruction.coordinates)) {
+          if (Array.isArray(instruction.coordinates[0])) {
+            [lng, lat] = instruction.coordinates[0];
+          } else {
+            lng = instruction.coordinates[0];
+            lat = instruction.coordinates[1];
+          }
+        } else if (instruction.coordinates.lat && instruction.coordinates.lng) { 
+          lat = instruction.coordinates.lat; 
+          lng = instruction.coordinates.lng; 
+        } else {
+          return;
+        }
+        
+        // Create a circle marker
+        const hollowCircle = L.circleMarker([lat, lng], {
+          radius: 12,
+          color: '#2A93EE',
+          weight: 3,
+          opacity: 0.9,
+          fill: false,
+          className: 'hollow-step-marker'
+        });
+        
+        // Add a centered icon in the middle of the circle
+        const iconHtml = `<div class="step-marker-icon">${getDirectionIconRef.current?.(instruction.type) || '•'}</div>`;
+        const icon = L.divIcon({ 
+          html: iconHtml, 
+          className: 'step-marker-container', 
+          iconSize: [24, 24], 
+          iconAnchor: [12, 12] 
+        });
+        const iconMarker = L.marker([lat, lng], { icon, interactive: false });
+        
+        // Add to group
+        group.addLayer(hollowCircle);
+        group.addLayer(iconMarker);
+        
+        // Add to map and store reference
+        group.addTo(map);
+        setActiveStepMarker(group);
+        
+        // Pan and zoom to the marker
+        map.setView([lat, lng], Math.max(15, map.getZoom()));
+      }
+    } catch (error) { 
+      console.error("Error highlighting route segment:", error); 
+    }
   };
   highlightRouteSegmentRef.current = highlightRouteSegment;
+
+  const clearActiveStepMarker = () => {
+    if (activeStepMarker && map) {
+      try {
+        // To ensure we properly remove the marker
+        map.removeLayer(activeStepMarker);
+        
+        // For layer groups, try to remove individual layers
+        if (activeStepMarker.eachLayer) {
+          activeStepMarker.eachLayer(layer => {
+            if (map.hasLayer(layer)) {
+              map.removeLayer(layer);
+            }
+          });
+        }
+      } catch (e) {
+        console.error("Error removing active marker:", e);
+      }
+      
+      setActiveStepMarker(null);
+      setActiveDirectionStep(null);
+    }
+  };
 
   const formatDate = (dateString) => {
     if (!dateString) return 'Unknown date';
     return new Date(dateString).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
   };
   formatDateRef.current = formatDate;
-
-  const toggleDirectionsCollapse = () => setIsDirectionsCollapsed(prev => !prev);
-  toggleDirectionsCollapseRef.current = toggleDirectionsCollapse;
 
   const toggleDirections = () => setIsDirectionsMinimized(prev => !prev);
   toggleDirectionsRef.current = toggleDirections;
@@ -1886,10 +2208,61 @@ function App() {
     }
   }, [directionsContentRef, showDirections, isDirectionsMinimized]);
 
+  useEffect(() => {
+    if (!map) return;
+    
+    const handleMapClick = (e) => {
+      // Clear the step marker when clicking elsewhere on the map
+      clearActiveStepMarker();
+    };
+    
+    map.on('click', handleMapClick);
+    
+    return () => {
+      map.off('click', handleMapClick);
+    };
+  }, [map, activeStepMarker]);
+
+  useEffect(() => {
+    if (isDirectionsMinimized || !showDirections) {
+      clearActiveStepMarker();
+    }
+  }, [isDirectionsMinimized, showDirections]);
+
+  // Add a direct document click handler to clear markers
+  useEffect(() => {
+    if (!document || !map) return;
+    
+    const documentClickHandler = (e) => {
+      // If click wasn't within the directions panel or on a step
+      if (!e.target.closest('.routing-directions-content') && 
+          !e.target.closest('.instruction-item')) {
+        clearActiveStepMarker();
+      }
+    };
+    
+    const mapClickHandler = () => {
+      clearActiveStepMarker();
+    };
+    
+    document.addEventListener('click', documentClickHandler);
+    map.on('click', mapClickHandler);
+    
+    return () => {
+      document.removeEventListener('click', documentClickHandler);
+      map.off('click', mapClickHandler);
+    };
+  }, [map]);
+
+  useEffect(() => {
+    if (isDirectionsMinimized || !showDirections) {
+      clearActiveStepMarker();
+    }
+  }, [isDirectionsMinimized, showDirections]);
+
   useEffect(() => { // Ensure directions panel state consistency
     if (showDirections && isDirectionsMinimized) setIsDirectionsMinimized(false);
   }, [showDirections]);
-
 
   // --- RouteTypeSelection Component (Inline) ---
   const RouteTypeSelection = () => {
@@ -1899,7 +2272,7 @@ function App() {
     
     const handleRouteTypeSelect = (selectedType) => {
       // If routes are still loading or calculation incomplete
-      if (routesAreLoading || !allRoutesComputed) {
+      if (routesStillLoading) {
         console.log(`Selected ${selectedType} route, but calculation still in progress. Selection saved.`);
         setRouteType(selectedType);
         
@@ -1945,8 +2318,9 @@ function App() {
               calculateRouteWithPoints(pointsToUse);
             }
           }, 100);
+        } else {
+          toast.error("Cannot recalculate - route points missing", { position: "top-center" });
         }
-        
         return;
       }
 
@@ -1955,10 +2329,10 @@ function App() {
 
       if (!selectedRouteData) {
           console.error(`Error: handleRouteTypeSelect called for ${selectedType}, but route data is missing.`);
-          toast.error(`Could not display ${selectedType} route. Data missing.`, { position: "top-center" });
+          toast.error(`Could not display ${selectedType} route. Data missing.`, { position: "top-center" }); 
           return; // Should not happen if button wasn't disabled
       }
-
+      
       setRouteType(selectedType); // Update state immediately
       console.log(`Route type selected: ${selectedType}`);
       if (skipRouteTypeSelection) localStorage.setItem('preferredRouteType', selectedType);
@@ -2077,7 +2451,6 @@ function App() {
     );
   };
 
-
   // --- JSX Return ---
   return (
     <div className="app-container">
@@ -2103,6 +2476,15 @@ function App() {
           
         {/* Map Controls */}
           <div className="map-controls">
+          {/* Existing zoom controls */}
+          {/* Add locate button */}
+          <button 
+            className={`map-control-button ${isLocating ? 'locating' : ''}`}
+            onClick={() => handleLocateRef.current?.()}
+            title="Use Current Location"
+          >
+            📍
+          </button>
           {/* Route Type Selector */}
             <button
             className={`map-control-button route-type-button ${!hasValidRoutePointsRef.current?.() ? 'disabled' : ''}`}
@@ -2160,40 +2542,72 @@ function App() {
         
         {/* Directions Panel (Full) */}
         {routeDirections && showDirections && !isDirectionsMinimized && (
-          <div className={`routing-directions-container ${isDirectionsCollapsed ? 'collapsed' : ''}`} onClick={e => e.stopPropagation()} onMouseDown={e => e.stopPropagation()} onTouchStart={e => e.stopPropagation()}>
+          <div className="routing-directions-container" 
+               onClick={e => e.stopPropagation()} 
+               onMouseDown={e => e.stopPropagation()} 
+               onTouchStart={e => e.stopPropagation()} 
+               onWheel={preventMapInteraction}
+               onMouseEnter={() => {
+                 const mapContainer = document.querySelector('.mapboxgl-map');
+                 if (mapContainer) mapContainer.style.pointerEvents = 'none';
+               }}
+               onMouseLeave={() => {
+                 const mapContainer = document.querySelector('.mapboxgl-map');
+                 if (mapContainer) mapContainer.style.pointerEvents = 'auto';
+               }}>
             <div className="routing-directions-header">
               {/* Header content */}
               <div className="routing-directions-title">
                 <div className="direction-endpoints">
-                   <span className="direction-origin">{originValue}</span> <span className="direction-separator">→</span> <span className="direction-destination">{destinationValue}</span>
+                   <span className="direction-origin">{routeDirections.origin || originValue}</span> 
+                   <span className="direction-separator">→</span> 
+                   <span className="direction-destination">{routeDirections.destination || destinationValue}</span>
                 </div>
               </div>
                <button className="routing-directions-close" onClick={() => setIsDirectionsMinimized(true)}>×</button>
             </div>
-            {!isDirectionsCollapsed && (
-              <div className="routing-directions-content" ref={directionsContentRef} onClick={e => e.stopPropagation()} onMouseDown={e => e.stopPropagation()} onTouchStart={e => e.stopPropagation()} onWheel={e => e.stopPropagation()}>
-                {/* Summary */}
-                <div className="routing-summary">
-                  <div><strong>Distance:</strong> {routeDirections.distanceFormatted}</div>
-                  <div><strong>Duration:</strong> {routeDirections.durationFormatted}</div>
-                </div>
-                 {/* Instructions List */}
-                <ul className="instruction-list">
-                   {routeDirections.steps?.map((step, index) => (
-                     <li key={index} className={`instruction-item ${activeDirectionStep === index ? 'active' : ''}`} onClick={(e) => { e.stopPropagation(); highlightRouteSegmentRef.current?.(step, index); }}>
-                       <div className="instruction-icon">{getDirectionIconRef.current?.(step.type) || '•'}</div>
-                        <div className="instruction-text">
-                          <div className="instruction-direction">{step.instruction}</div>
-                          <div className="instruction-distance">{step.distanceFormatted}</div>
-                        </div>
-                      </li>
-                   )) || <li className="instruction-item"><div className="instruction-text">No detailed directions available</div></li>}
-                </ul>
+            <div className="routing-directions-content" 
+                 ref={directionsContentRef} 
+                 onClick={e => e.stopPropagation()} 
+                 onMouseDown={e => e.stopPropagation()} 
+                 onTouchStart={e => e.stopPropagation()} 
+                 onWheel={preventMapInteraction}
+                 onMouseEnter={() => {
+                   const mapContainer = document.querySelector('.mapboxgl-map');
+                   if (mapContainer) mapContainer.style.pointerEvents = 'none';
+                 }}
+                 onMouseLeave={() => {
+                   const mapContainer = document.querySelector('.mapboxgl-map');
+                   if (mapContainer) mapContainer.style.pointerEvents = 'auto';
+                 }}>
+              {/* Summary */}
+              <div className="routing-summary">
+                <div><strong>Distance:</strong> {routeDirections.distanceFormatted}</div>
+                <div><strong>Duration:</strong> {routeDirections.durationFormatted}</div>
+                <div><strong>Ascend:</strong> {routeDirections.ascendFormatted}</div>
+                <div><strong>Descend:</strong> {routeDirections.descendFormatted}</div>
               </div>
-            )}
-            {/* Collapse Toggle */}
-            <div className="routing-directions-collapse" onClick={(e) => { e.stopPropagation(); toggleDirectionsCollapseRef.current?.(); }}>
-               <div className="collapse-arrow">{isDirectionsCollapsed ? '▼' : '▲'}</div>
+               {/* Instructions List */}
+              <ul className="instruction-list" onClick={(e) => clearActiveStepMarker()}>
+                 {routeDirections.steps?.map((step, index) => (
+                   <li key={index} 
+                       className={`instruction-item ${activeDirectionStep === index ? 'active' : ''}`} 
+                       onClick={(e) => { 
+                         e.stopPropagation(); 
+                         highlightRouteSegmentRef.current?.(step, index, e); 
+                       }}>
+                     <div className={`instruction-icon icon-${step.type?.toLowerCase() || 'default'}`}>
+                       {getDirectionIconRef.current?.(step.type) || '•'}
+                     </div>
+                     <div className="instruction-text">
+                       <div className="instruction-direction">{step.instruction}</div>
+                       <div className="instruction-distance">{step.distanceFormatted}</div>
+                       <div className="instruction-road-info">{step.roadInfo}</div>
+                       <div className="instruction-elevation-info">{step.elevationInfo}</div>
+                     </div>
+                   </li>
+                 )) || <li className="instruction-item"><div className="instruction-text">No detailed directions available</div></li>}
+              </ul>
             </div>
           </div>
         )}
@@ -2264,13 +2678,51 @@ function App() {
                <div className="search-form"><div className="input-group"><div className="input-container">
                  <input ref={originInputRef} type="text" placeholder="Origin" value={originValue} onChange={(e) => handleInputChangeRef.current?.(e, true)} onFocus={() => handleInputFocusRef.current?.(true)} onBlur={() => handleInputBlurRef.current?.(true)} />
                  {originValue && <button className="clear-input" onClick={() => handleClearInputRef.current?.(true)}>×</button>}
-                 {showOriginSuggestions && originSuggestions.length > 0 && <div className="suggestions-dropdown origin-suggestions">{originSuggestions.map((s, i) => <div key={i} className="suggestion-item" onClick={() => handleSuggestionSelectRef.current?.(s, true)} onMouseDown={e => e.preventDefault()}>{s.place_name}</div>)}</div>}
+                 {showOriginSuggestions && originSuggestions.length > 0 && 
+                  <div className="suggestions-dropdown origin-suggestions"
+                       onWheel={preventMapInteraction}
+                       onMouseEnter={() => {
+                         const mapContainer = document.querySelector('.mapboxgl-map');
+                         if (mapContainer) mapContainer.style.pointerEvents = 'none';
+                       }}
+                       onMouseLeave={() => {
+                         const mapContainer = document.querySelector('.mapboxgl-map');
+                         if (mapContainer) mapContainer.style.pointerEvents = 'auto';
+                       }}>
+                    {originSuggestions.map((s, i) => 
+                      <div key={i} className="suggestion-item" 
+                           onClick={() => handleSuggestionSelectRef.current?.(s, true)} 
+                           onMouseDown={e => e.preventDefault()}>
+                        {s.place_name}
+                      </div>
+                    )}
+                  </div>
+                 }
                </div></div></div>
                {/* Destination Input */}
                <div className="search-form"><div className="input-group"><div className="input-container">
                  <input type="text" placeholder="Destination" value={destinationValue} onChange={(e) => handleInputChangeRef.current?.(e, false)} onFocus={() => handleInputFocusRef.current?.(false)} onBlur={() => handleInputBlurRef.current?.(false)} />
                  {destinationValue && <button className="clear-input" onClick={() => handleClearInputRef.current?.(false)}>×</button>}
-                 {showDestinationSuggestions && destinationSuggestions.length > 0 && <div className="suggestions-dropdown destination-suggestions">{destinationSuggestions.map((s, i) => <div key={i} className="suggestion-item" onClick={() => handleSuggestionSelectRef.current?.(s, false)} onMouseDown={e => e.preventDefault()}>{s.place_name}</div>)}</div>}
+                 {showDestinationSuggestions && destinationSuggestions.length > 0 && 
+                  <div className="suggestions-dropdown destination-suggestions"
+                       onWheel={preventMapInteraction}
+                       onMouseEnter={() => {
+                         const mapContainer = document.querySelector('.mapboxgl-map');
+                         if (mapContainer) mapContainer.style.pointerEvents = 'none';
+                       }}
+                       onMouseLeave={() => {
+                         const mapContainer = document.querySelector('.mapboxgl-map');
+                         if (mapContainer) mapContainer.style.pointerEvents = 'auto';
+                       }}>
+                    {destinationSuggestions.map((s, i) => 
+                      <div key={i} className="suggestion-item" 
+                           onClick={() => handleSuggestionSelectRef.current?.(s, false)} 
+                           onMouseDown={e => e.preventDefault()}>
+                        {s.place_name}
+                      </div>
+                    )}
+                  </div>
+                 }
                </div></div></div>
 
               {/* Cell Tower Toggle in Search */}
@@ -2282,8 +2734,6 @@ function App() {
                 {/* Display count from allTowers ref */}
                 <div className="tower-count">{allTowers.current.length > 0 ? `${allTowers.current.length} cell towers available` : 'No cell towers found'}</div>
               </div>
-              
-              {/* Remove Route Info Display - as requested */}
               
               {/* Loading Indicator */}
               {(isLoadingRoute || calculationAnimation) && (
@@ -2337,11 +2787,13 @@ function App() {
             </div>
           </div>
         )}
+        
+        {/* Modals */}
+        {showRouteTypeSelection && <RouteTypeSelection />}
+        {optimizationNotice && <div className="optimization-notice">{optimizationNotice.message}</div>
+        }
       </div>
       
-      {/* Modals */}
-      <RouteTypeSelection />
-      {optimizationNotice && <div className="optimization-notice">{optimizationNotice.message}</div>}
     </div>
   );
 }
