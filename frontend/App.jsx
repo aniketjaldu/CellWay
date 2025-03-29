@@ -358,11 +358,25 @@ function App() {
     const originName = route.origin.place_name || `${originLat.toFixed(5)}, ${originLng.toFixed(5)}`;
     const destName = route.destination.place_name || `${destLat.toFixed(5)}, ${destLng.toFixed(5)}`;
     
-    // Update UI
+    // First, completely clear the existing route display and data
+    clearRouteDisplayRef.current?.();
+    setRouteDirections(null);
+    setShowDirections(false);
+    setRouteInfo(null);
+    setAllRoutesComputed(false);
+    setComputedRoutes({ fastest: null, cell_coverage: null, balanced: null });
+    setComputedRouteTowers({ fastest: [], cell_coverage: [], balanced: [] });
+    
+    // Then update UI with the new route data - this must happen BEFORE any route processing
     setOriginValue(originName);
     setDestinationValue(destName);
     setOriginSuggestions([]); // Clear suggestions
     setDestinationSuggestions([]);
+    
+    // Explicitly set the route origin and destination display values
+    // This ensures the directions panel header shows the correct values
+    setRouteOriginDisplay(originName);
+    setRouteDestinationDisplay(destName);
     
     // Update map markers
     const originLatLng = L.latLng(originLat, originLng);
@@ -374,9 +388,6 @@ function App() {
     const savedType = route.route_type || 'balanced';
     setRouteType(savedType);
     localStorage.setItem('preferredRouteType', savedType); // Update preference too
-    
-    // Clear any existing route display
-    clearRouteDisplayRef.current?.();
     
     // Update state to reflect loaded route
     setCurrentRoutePoints({
@@ -408,8 +419,8 @@ function App() {
       // Set current type
       setRouteType(savedType);
       
-      // Display the selected route type
-      displayRouteRef.current?.(route.route_data[savedType], savedType);
+      // Display the selected route type with forced origin/destination values
+      displayRouteRef.current?.(route.route_data[savedType], savedType, originName, destName);
       
       // Set route info for display
       if (route.route_data[savedType]) {
@@ -492,7 +503,7 @@ function App() {
         if (coordinates.length > 0) {
           // Create the route line with styling
           const routeStyle = {
-            color: getRouteLineColor(savedType),
+            color: getRouteLineColorRef.current?.(savedType),
             weight: 5,
             opacity: 0.7
           };
@@ -545,7 +556,8 @@ function App() {
       map.fitBounds(bounds, { padding: [60, 60], maxZoom: 15 });
       
       // Manually trigger the route display with the saved data
-      displayRouteRef.current?.(route.route_data, savedType);
+      // Use forced origin/destination values
+      displayRouteRef.current?.(route.route_data, savedType, originName, destName);
       
       // Set all routes computed to true to prevent automatic recalculation
       setAllRoutesComputed(true);
@@ -1028,6 +1040,8 @@ function App() {
       // Update state with all results
       setComputedRoutes(newComputedRoutes);
       setComputedRouteTowers(newComputedRouteTowers);
+      setRouteOriginDisplay(originValue);
+setRouteDestinationDisplay(destinationValue);
 
       console.log("CALC ALL: Processed computed routes:", newComputedRoutes);
 
@@ -1249,7 +1263,7 @@ function App() {
   findTowersAlongRouteRef.current = findTowersAlongRoute;
 
   // Extract and format directions from GraphHopper route data
-  const extractDirections = useCallback((routeData) => {
+  const extractDirections = useCallback((routeData, forceOrigin, forceDestination) => {
     if (!routeData?.routes?.[0]?.legs?.[0]?.steps) {
       console.warn("extractDirections: No steps found in route data.");
       return null;
@@ -1272,10 +1286,11 @@ function App() {
 
     let formattedSteps = [];
 
-    // Add initial departure step
+    // Add initial departure step - use the forced origin if provided, otherwise use current state
+    const currentOrigin = forceOrigin || originValue || 'Origin';
     formattedSteps.push({
       type: 'start',
-      instruction: `Depart from ${originValue || 'Origin'}`,
+      instruction: `Depart from ${currentOrigin}`,
       distanceFormatted: '',
       coordinates: steps[0]?.geometry?.coordinates?.[0] || null, // First coordinate of first step
       segmentCoordinates: [] // No specific segment for start
@@ -1334,7 +1349,7 @@ function App() {
   extractDirectionsRef.current = extractDirections;
 
   // Display Route on Map
-  const displayRoute = useCallback((routeData, displayedRouteType) => {
+  const displayRoute = useCallback((routeData, displayedRouteType, forceOrigin, forceDestination) => {
     if (!map || !routeData?.routes?.[0]?.geometry?.coordinates) {
       console.error("displayRoute: Map not ready or no valid route geometry.");
       clearRouteDisplayRef.current?.(); // Clear any old route
@@ -1342,6 +1357,14 @@ function App() {
     }
 
     clearRouteDisplayRef.current?.(); // Clear previous route visuals first
+    
+    // Always update the route origin and destination display values first
+    // This ensures the directions panel header is updated before any directions are shown
+    const originToUse = forceOrigin || originValue;
+    const destinationToUse = forceDestination || destinationValue;
+    
+    setRouteOriginDisplay(originToUse);
+    setRouteDestinationDisplay(destinationToUse);
 
     try {
       const route = routeData.routes[0];
@@ -1365,11 +1388,9 @@ function App() {
       // Fit map to the route bounds
       map.fitBounds(routeLine.getBounds(), { padding: [50, 50], maxZoom: 16 });
 
-      // Extract and set directions
-      const directions = extractDirectionsRef.current?.(routeData);
+      // Extract and set directions - pass forced origin/destination if provided
+      const directions = extractDirectionsRef.current?.(routeData, originToUse, destinationToUse);
       if (directions?.steps?.length > 0) {
-        setRouteOriginDisplay(originValue); // Capture origin used for this route
-        setRouteDestinationDisplay(destinationValue); // Capture destination used for this route
         setRouteDirections(directions);
         setShowDirections(true); // Ensure directions panel is shown
         setIsDirectionsMinimized(false); // Ensure it's not minimized
