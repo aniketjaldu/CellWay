@@ -2174,7 +2174,9 @@ setRouteDestinationDisplay(destinationValue);
         const selectedRouteData = computedRoutes[selectedType];
         if (selectedRouteData) {
             console.log(`RouteTypeSelection: Displaying selected type '${selectedType}'`);
-            displayRouteRef.current?.(selectedRouteData, selectedType);
+            // Pass the current route origin and destination display values to preserve them
+            // This ensures the directions panel and steps use the correct values
+            displayRouteRef.current?.(selectedRouteData, selectedType, routeOriginDisplay, routeDestinationDisplay);
         } else {
             // This case means the data wasn't ready, which shouldn't happen if button wasn't disabled.
             // However, if it does, we might re-trigger calculation for the selected type.
