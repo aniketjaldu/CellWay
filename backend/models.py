@@ -167,7 +167,7 @@ def reset_password(email, new_password):
 
 
 # --- Route Management Functions ---
-def save_route(user_id, origin, destination, route_data, route_type="balanced"):
+def save_route(user_id, origin, destination, route_data, route_type="balanced", route_image=None):
     """
     Saves a route for a specific user.
 
@@ -180,6 +180,7 @@ def save_route(user_id, origin, destination, route_data, route_type="balanced"):
         destination (dict or str): Information about the route destination.
         route_data (dict): The detailed route data (e.g., geometry, duration).
         route_type (str): The optimization type ('fastest', 'balanced', etc.).
+        route_image (str, optional): Base64 encoded image of the route map.
 
     Returns:
         ObjectId: The ID of the newly inserted route document.
@@ -214,6 +215,10 @@ def save_route(user_id, origin, destination, route_data, route_type="balanced"):
             'route_type': route_type,
             'created_at': datetime.datetime.utcnow()
         }
+        
+        # Add route image if provided
+        if route_image:
+            new_route['route_image'] = route_image
 
         # Insert the new route
         result = routes_collection.insert_one(new_route)

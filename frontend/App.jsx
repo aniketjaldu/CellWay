@@ -7,6 +7,7 @@ import LoginIcon from './assets/svg/login-icon.svg';
 import RegisterIcon from './assets/svg/register-icon.svg';
 import axios from 'axios';
 import { toast } from 'react-hot-toast';
+import html2canvas from 'html2canvas';
 
 // Create axios instance with credentials support
 const api = axios.create({
@@ -181,7 +182,7 @@ function App() {
       setSavedRoutes(response.data || []);
     } catch (error) {
       console.error("Error fetching saved routes:", error);
-      toast.error("Could not load saved routes.");
+      toast.error("Could not load saved routes.", { position: "bottom-center" });
       setSavedRoutes([]); // Clear on error
     }
   };
@@ -200,7 +201,7 @@ function App() {
         // Clear form fields
         setEmail('');
         setPassword('');
-        toast.success('Logged in successfully!');
+        toast.success('Logged in successfully!', { position: "bottom-center" });
       }
       // No explicit else needed, backend error handled in catch
     } catch (error) {
@@ -235,7 +236,7 @@ function App() {
         setEmail('');
         setPassword('');
         setConfirmPassword('');
-        toast.success('Registration successful! You are now logged in.');
+        toast.success('Registration successful! You are now logged in.', { position: "bottom-center" });
         // No need to fetch saved routes immediately after registration
       }
     } catch (error) {
@@ -253,10 +254,10 @@ function App() {
       setUser(null);
       setSavedRoutes([]); // Clear saved routes on logout
       setShowSavedRoutes(false); // Close panel if open
-      toast.success('Logged out.');
+      toast.success('Logged out.', { position: "bottom-center" });
     } catch (error) {
       console.error("Logout failed:", error);
-      toast.error("Logout failed. Please try again.");
+      toast.error("Logout failed. Please try again.", { position: "bottom-center" });
     }
   };
   handleLogoutRef.current = handleLogout;
@@ -304,6 +305,27 @@ function App() {
       if (!prev && user) {
         fetchSavedRoutesRef.current?.();
       }
+      
+      // If closing, ensure map interactions are re-enabled
+      if (prev && map) {
+        // Re-enable map interactions
+        map.dragging.enable();
+        map.touchZoom.enable();
+        map.doubleClickZoom.enable();
+        map.scrollWheelZoom.enable();
+        map.boxZoom.enable();
+        map.keyboard.enable();
+        if (map.tap) map.tap.enable();
+        
+        // Remove the indicator class
+        document.getElementById('map')?.classList.remove('map-interactions-disabled');
+      }
+      
+      // Close search bar if it's open
+      if (searchExpanded) {
+        setSearchExpanded(false);
+      }
+      
       return !prev;
     });
   };
@@ -316,13 +338,13 @@ function App() {
     // Check if map is ready and route has the necessary data
     if (!map) {
       console.error("Cannot load saved route: Map not ready");
-      toast.error("Could not load the selected route. Map not ready.");
+      toast.error("Could not load the selected route. Map not ready.", { position: "bottom-center" });
       return;
     }
     
     if (!route || !route.origin || !route.destination) {
       console.error("Cannot load saved route: Route data incomplete", route);
-      toast.error("Could not load the selected route. Data incomplete.");
+      toast.error("Could not load the selected route. Data incomplete.", { position: "bottom-center" });
       return;
     }
     
@@ -341,8 +363,6 @@ function App() {
     setDestinationValue(destName);
     setOriginSuggestions([]); // Clear suggestions
     setDestinationSuggestions([]);
-    setShowSavedRoutes(false); // Close panel
-    setSearchExpanded(false); // Collapse search panel
     
     // Update map markers
     const originLatLng = L.latLng(originLat, originLng);
@@ -355,33 +375,185 @@ function App() {
     setRouteType(savedType);
     localStorage.setItem('preferredRouteType', savedType); // Update preference too
     
-    // Trigger map update and route calculation
-    updateMapViewRef.current?.(originLatLng, destLatLng);
+    // Clear any existing route display
+    clearRouteDisplayRef.current?.();
     
-    // Ensure map interactions are re-enabled
-    if (map) {
-      // Re-enable all map interactions
-      map.dragging.enable();
-      map.touchZoom.enable();
-      map.doubleClickZoom.enable();
-      map.scrollWheelZoom.enable();
-      map.boxZoom.enable();
-      map.keyboard.enable();
-      if (map.tap) map.tap.enable();
+    // Update state to reflect loaded route
+    setCurrentRoutePoints({
+      start: { lat: originLat, lng: originLng },
+      end: { lat: destLat, lng: destLng }
+    });
+    
+    // Check if we have multiple route types saved
+    const hasMultipleRouteTypes = route.has_multiple_routes || 
+                                 (route.route_data && typeof route.route_data === 'object' && 
+                                  Object.keys(route.route_data).length > 1);
+    
+    // Set computed routes with the saved route data
+    const updatedComputedRoutes = { ...computedRoutes };
+    
+    // Handle new format (multiple route types)
+    if (hasMultipleRouteTypes && typeof route.route_data === 'object') {
+      // Load all saved route types
+      Object.keys(route.route_data).forEach(type => {
+        if (route.route_data[type]) {
+          updatedComputedRoutes[type] = route.route_data[type];
+        }
+      });
+      setComputedRoutes(updatedComputedRoutes);
       
-      // Remove the indicator class if it exists
-      const mapElement = document.getElementById('map');
-      if (mapElement) {
-        mapElement.classList.remove('map-interactions-disabled');
+      // Set all routes computed to true
+      setAllRoutesComputed(true);
+      
+      // Set current type
+      setRouteType(savedType);
+      
+      // Display the selected route type
+      displayRouteRef.current?.(route.route_data[savedType], savedType);
+      
+      // Set route info for display
+      if (route.route_data[savedType]) {
+        setRouteInfo({
+          distance: route.route_data[savedType].distance,
+          duration: route.route_data[savedType].duration,
+          routeType: savedType
+        });
+        
+        // Set route directions if available
+        if (route.route_data[savedType].legs && route.route_data[savedType].legs[0] && route.route_data[savedType].legs[0].steps) {
+          setRouteDirections(route.route_data[savedType].legs[0].steps);
+        }
+      }
+      
+      // Update route display information
+      setRouteOriginDisplay(originName);
+      setRouteDestinationDisplay(destName);
+      
+      // Fit map to the route bounds
+      try {
+        // Get coordinates for the current route type
+        let coordinates = [];
+        
+        // Try to get coordinates from route_geometry first (enhanced format)
+        if (route.route_geometry && route.route_geometry[savedType] && route.route_geometry[savedType].coordinates) {
+          coordinates = route.route_geometry[savedType].coordinates.map(coord => [coord[1], coord[0]]);
+        }
+        // Fall back to route_data geometry
+        else if (route.route_data[savedType].geometry && route.route_data[savedType].geometry.coordinates) {
+          coordinates = route.route_data[savedType].geometry.coordinates.map(coord => [coord[1], coord[0]]);
+        }
+        
+        if (coordinates.length > 0) {
+          const bounds = L.latLngBounds(coordinates);
+          map.fitBounds(bounds, { padding: [60, 60], maxZoom: 15 });
+        } else {
+          // Fallback to fitting bounds based on origin and destination
+          const bounds = L.latLngBounds([originLatLng, destLatLng]);
+          map.fitBounds(bounds, { padding: [60, 60], maxZoom: 15 });
+        }
+      } catch (error) {
+        console.error("Error fitting map bounds:", error);
+        // Fallback to fitting bounds based on origin and destination
+        const bounds = L.latLngBounds([originLatLng, destLatLng]);
+        map.fitBounds(bounds, { padding: [60, 60], maxZoom: 15 });
+      }
+      
+      // Show a toast indicating multiple route types are available
+      if (hasMultipleRouteTypes) {
+        toast.success(`Multiple route options available. Currently showing "${savedType}" route.`, { 
+          position: "bottom-center",
+          duration: 4000
+        });
+      }
+      
+      return; // Exit early as we've handled the route display
+    }
+    
+    // Handle legacy format (single route type)
+    else {
+      // Set the single route type
+      updatedComputedRoutes[savedType] = route.route_data;
+      setComputedRoutes(updatedComputedRoutes);
+      
+      // Create a route line from the saved route data
+      try {
+        // Get coordinates from the route data
+        let coordinates = [];
+        
+        // Check if we have enhanced geometry data
+        if (route.route_geometry && route.route_geometry.coordinates && route.route_geometry.coordinates.length > 0) {
+          coordinates = route.route_geometry.coordinates.map(coord => [coord[1], coord[0]]);
+        } 
+        // Otherwise extract from the route_data
+        else if (route.route_data.geometry && route.route_data.geometry.coordinates) {
+          coordinates = route.route_data.geometry.coordinates.map(coord => [coord[1], coord[0]]);
+        }
+        
+        if (coordinates.length > 0) {
+          // Create the route line with styling
+          const routeStyle = {
+            color: getRouteLineColor(savedType),
+            weight: 5,
+            opacity: 0.7
+          };
+          
+          // Create and add the route line to the map
+          if (routeControlRef.current && map) {
+            try { map.removeLayer(routeControlRef.current); } catch(e) {}
+          }
+          
+          routeControlRef.current = L.polyline(coordinates, routeStyle).addTo(map);
+          
+          // Set route info for display
+          setRouteInfo({
+            distance: route.route_data.distance,
+            duration: route.route_data.duration,
+            routeType: savedType
+          });
+          
+          // Set route directions if available
+          if (route.route_data.legs && route.route_data.legs[0] && route.route_data.legs[0].steps) {
+            setRouteDirections(route.route_data.legs[0].steps);
+          }
+          
+          // Update route display information
+          setRouteOriginDisplay(originName);
+          setRouteDestinationDisplay(destName);
+          
+          // Fit map to the route bounds
+          const bounds = L.latLngBounds(coordinates);
+          map.fitBounds(bounds, { padding: [60, 60], maxZoom: 15 });
+          
+          // Set all routes computed to true to prevent automatic recalculation
+          setAllRoutesComputed(true);
+          
+          // Set the current route as active
+          setRouteType(savedType);
+          
+          return; // Exit early as we've handled the route display
+        }
+      } catch (error) {
+        console.error("Error displaying saved route:", error);
       }
     }
     
-    // Calculate the route using the saved route type
-    setTimeout(() => {
-      calculateRouteRef.current?.(originLat, originLng, destLat, destLng, savedType);
-    }, 300); // Short delay to ensure markers are placed first
-    
-  }, [map]); // Dependencies: map
+    // Fallback to standard route loading if direct display fails
+    // But avoid triggering a recalculation by NOT calling updateMapViewRef
+    // Instead, just fit the map to the points
+    try {
+      const bounds = L.latLngBounds([originLatLng, destLatLng]);
+      map.fitBounds(bounds, { padding: [60, 60], maxZoom: 15 });
+      
+      // Manually trigger the route display with the saved data
+      displayRouteRef.current?.(route.route_data, savedType);
+      
+      // Set all routes computed to true to prevent automatic recalculation
+      setAllRoutesComputed(true);
+    } catch (error) {
+      console.error("Error fitting map bounds:", error);
+      toast.error("Error displaying saved route", { position: "bottom-center" });
+    }
+  }, [map, computedRoutes]); // Dependencies
   loadSavedRouteRef.current = loadSavedRoute;
 
   // Toggle search panel expansion
@@ -427,7 +599,7 @@ function App() {
       };
     } catch (error) {
         console.error("Failed to initialize Leaflet map:", error);
-        toast.error("Map failed to load. Please refresh the page.");
+        toast.error("Map failed to load. Please refresh the page.", { position: "bottom-center" });
     }
   }, [mapTilerKey]); // Re-run only if mapTilerKey changes (shouldn't happen often)
 
@@ -478,7 +650,7 @@ function App() {
 
     const { min_lat, min_lng, max_lat, max_lng } = bounds;
     console.log(`Fetching cell towers in area: ${min_lat.toFixed(4)},${min_lng.toFixed(4)} to ${max_lat.toFixed(4)},${max_lng.toFixed(4)}`);
-    const loadingToastId = toast.loading("Fetching cell tower data...", { position: "top-center" });
+    const loadingToastId = toast.loading("Fetching cell tower data...", { position: "bottom-center" });
 
     try {
       const response = await api.get('/towers', {
@@ -496,11 +668,11 @@ function App() {
       if (totalFetched > 0) {
         allTowers.current = fetchedTowers; // Update the master tower store
         toast.success(`Found ${totalFetched} cell towers (${source})`, {
-          duration: 2500, position: "top-center", icon: "📡"
+          duration: 2500, position: "bottom-center", icon: "📡"
         });
       } else {
         allTowers.current = []; // Clear if none found
-        toast.info("No cell towers found in this area.", { duration: 3000, position: "top-center" });
+        toast.info("No cell towers found in this area.", { duration: 3000, position: "bottom-center" });
       }
 
       // Trigger display update explicitly after fetching
@@ -510,7 +682,7 @@ function App() {
     } catch (error) {
       console.error("Error fetching cell tower data:", error);
       toast.dismiss(loadingToastId);
-      toast.error("Error fetching cell tower data.", { duration: 3000, position: "top-center" });
+      toast.error("Error fetching cell tower data.", { duration: 3000, position: "bottom-center" });
       allTowers.current = []; // Clear on error
       displayTowersRef.current?.(); // Update display to show nothing
       return []; // Return empty array on error
@@ -585,7 +757,7 @@ function App() {
       setSuggestions([]);
       setShowSuggestions(false);
       // Optionally show a toast message for API errors
-      // toast.error("Could not fetch address suggestions.");
+      // toast.error("Could not fetch address suggestions.", { position: "bottom-center" });
     }
   }, [mapTilerKey]);
   handleInputChangeRef.current = handleInputChange;
@@ -594,10 +766,24 @@ function App() {
   const handleInputFocus = useCallback((isOrigin) => {
     const suggestions = isOrigin ? originSuggestions : destinationSuggestions;
     const setShow = isOrigin ? setShowOriginSuggestions : setShowDestinationSuggestions;
+    const inputValue = isOrigin ? originValue : destinationValue;
+    
     if (suggestions.length > 0) {
       setShow(true);
+    } 
+    // If we have text in the input but no suggestions (e.g., after loading a saved route),
+    // fetch suggestions for the current text
+    else if (inputValue && inputValue.trim().length > 2) {
+      // Create a synthetic event to pass to handleInputChange
+      const syntheticEvent = {
+        target: { value: inputValue },
+        preventDefault: () => {}
+      };
+      
+      // Trigger the input change handler to fetch suggestions
+      handleInputChangeRef.current?.(syntheticEvent, isOrigin);
     }
-  }, [originSuggestions, destinationSuggestions]);
+  }, [originSuggestions, destinationSuggestions, originValue, destinationValue]);
   handleInputFocusRef.current = handleInputFocus;
 
   // Hide suggestions on input blur (with delay for click handling)
@@ -779,7 +965,7 @@ function App() {
   const calculateAllRouteTypes = useCallback(async (points) => {
     if (!points?.start?.lat || !points?.end?.lat) {
       console.error("CALC ALL: Cannot calculate routes - missing or invalid route points:", points);
-      toast.error("Cannot calculate route: Origin or Destination missing.");
+      toast.error("Cannot calculate route: Origin or Destination missing.", { position: "bottom-center" });
       setRoutesAreLoading(false);
       return;
     }
@@ -808,7 +994,7 @@ function App() {
         calculateRouteRef.current?.(start.lat, start.lng, end.lat, end.lng, type)
           .catch(error => {
             console.error(`CALC ALL: Failed to calculate '${type}' route:`, error);
-            toast.error(`Failed to calculate ${type} route.`);
+            toast.error(`Failed to calculate ${type} route.`, { position: "bottom-center" });
             calculationSuccess = false; // Mark failure
             return null; // Return null on error for this specific type
           })
@@ -860,16 +1046,16 @@ function App() {
         displayRouteRef.current?.(routeDataToDisplay, typeToDisplay);
       } else {
          console.error("CALC ALL: No routes available to display after calculation.");
-         toast.error("Could not display any route.");
+         toast.error("Could not display any route.", { position: "bottom-center" });
       }
 
     } catch (error) {
       console.error('CALC ALL: Error during route calculation process:', error);
       // Toast shown inside the Promise.all catch or here for general failure
       if (error.message === "All route calculations failed.") {
-           toast.error("Failed to calculate any routes. Please check points or try again.");
+           toast.error("Failed to calculate any routes. Please check points or try again.", { position: "bottom-center" });
       } else {
-           toast.error("An unexpected error occurred while calculating routes.");
+           toast.error("An unexpected error occurred while calculating routes.", { position: "bottom-center" });
       }
        clearRouteDisplayRef.current?.(); // Clear any partial visuals
 
@@ -1206,7 +1392,7 @@ function App() {
 
     } catch (error) {
       console.error("Error displaying route:", error);
-      toast.error("Error displaying route.");
+      toast.error("Error displaying route.", { position: "bottom-center" });
       clearRouteDisplayRef.current?.(); // Clean up partial display on error
     }
   }, [map]); // Dependencies
@@ -1350,13 +1536,13 @@ function App() {
   const handleLocate = useCallback(async () => {
     if (!map) return;
     if (!('geolocation' in navigator)) {
-      toast.error('Geolocation is not supported by your browser.');
+      toast.error('Geolocation is not supported by your browser.', { position: "bottom-center" });
       return;
     }
 
     setIsLocating(true);
-    const locateToastId = toast.loading("Getting your location...", { position: "top-center" });
-
+    const locateToastId = toast.loading("Getting your location...", { position: "bottom-center" });
+    
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         const { latitude, longitude } = position.coords;
@@ -1383,7 +1569,7 @@ function App() {
           // Fallback to coords already set
         } finally {
           toast.dismiss(locateToastId);
-          toast.success('Location found!', { duration: 2000, position: "top-center" });
+          toast.success('Location found!', { duration: 2000, position: "bottom-center" });
 
           // Update origin state and marker
           setOriginValue(placeName);
@@ -1441,7 +1627,7 @@ function App() {
       (error) => {
         console.error('Geolocation error:', error);
         toast.dismiss(locateToastId);
-        toast.error(`Could not get location: ${error.message}`, { duration: 4000 });
+        toast.error(`Could not get location: ${error.message}`, { duration: 4000, position: "bottom-center" });
         setIsLocating(false);
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 } // Options
@@ -1640,40 +1826,231 @@ function App() {
       const currentRouteData = currentType ? computedRoutes[currentType] : null;
 
       if (!user) {
-          toast.error("Please log in to save routes.");
+          toast.error("Please log in to save routes.", { position: "bottom-center" });
           toggleAuthFormRef.current?.(); // Open login form
           return;
       }
       if (!currentRouteData || !currentRoutePoints?.start || !currentRoutePoints?.end) {
-          toast.error("No valid route to save.");
+          toast.error("No valid route to save.", { position: "bottom-center" });
           return;
       }
       if (!originValue || !destinationValue) {
-           toast.error("Origin or Destination name missing.");
+           toast.error("Origin or Destination name missing.", { position: "bottom-center" });
            return;
       }
 
-      const saveData = {
-          origin: { place_name: originValue, lat: currentRoutePoints.start.lat, lng: currentRoutePoints.start.lng },
-          destination: { place_name: destinationValue, lat: currentRoutePoints.end.lat, lng: currentRoutePoints.end.lng },
-          route_data: currentRouteData, // Save the full route object from backend
-          route_type: currentType
-      };
-
-      const saveToastId = toast.loading("Saving route...");
+      // Check which route types have been computed
+      const availableRouteTypes = {};
+      let hasMultipleRoutes = false;
+      
+      // Check each route type
+      ['fastest', 'cell_coverage', 'balanced'].forEach(type => {
+          if (computedRoutes[type]) {
+              availableRouteTypes[type] = true;
+              if (type !== currentType) hasMultipleRoutes = true;
+          }
+      });
+      
+      // Show initial loading toast
+      const saveToastId = toast.loading("Capturing route image...", { position: "bottom-center" });
+      
       try {
+          // Get the map element
+          const mapElement = document.getElementById('map');
+          
+          // Store original map view state and UI element visibility
+          const originalCenter = map.getCenter();
+          const originalZoom = map.getZoom();
+          
+          // Store current UI visibility states
+          const directionsVisible = document.querySelector('.routing-directions-container')?.style.display;
+          const searchVisible = document.querySelector('.search-container')?.style.display;
+          const authButtonsVisible = document.querySelector('.auth-buttons')?.style.display;
+          const mapControlsVisible = document.querySelector('.map-controls')?.style.display;
+          
+          // Store current route line visibility
+          let routeLine = null;
+          if (routeControlRef.current) {
+            routeLine = routeControlRef.current;
+            map.removeLayer(routeLine);
+          }
+          
+          // Hide all UI elements temporarily
+          document.querySelectorAll('.routing-directions-container, .search-container, .search-button-container, .auth-buttons, .map-controls').forEach(el => {
+            if (el) el.style.display = 'none';
+          });
+          
+          // Create a canvas for the combined image
+          const combinedCanvas = document.createElement('canvas');
+          const combinedCtx = combinedCanvas.getContext('2d');
+          
+          // Calculate the dimensions to maintain aspect ratio
+          const aspectRatio = 800 / 400;
+          const targetHeight = 400;
+          const targetWidth = Math.floor(targetHeight * aspectRatio);
+          
+          // Clear the combined canvas and set its dimensions
+          combinedCanvas.width = targetWidth * 2;
+          combinedCanvas.height = targetHeight;
+          
+          // First, capture origin point closeup
+          map.setView([currentRoutePoints.start.lat, currentRoutePoints.start.lng], 21);
+          // Wait for map to finish panning/zooming
+          await new Promise(resolve => setTimeout(resolve, 1500));
+          
+          // Add a temporary marker for the origin if not already visible
+          const originMarker = L.marker([currentRoutePoints.start.lat, currentRoutePoints.start.lng], {
+            icon: L.divIcon({
+              className: 'custom-div-icon',
+              html: `<div style="background-color: #2563eb; width: 40px; height: 40px; border-radius: 50%; border: 5px solid white; box-shadow: 0 0 15px rgba(0,0,0,0.7);"></div>`,
+              iconSize: [40, 40],
+              iconAnchor: [20, 20]
+            })
+          }).addTo(map);
+          
+          // Create a temporary canvas for cropping
+          const tempOriginCanvas = await html2canvas(mapElement, {
+              useCORS: true,
+              allowTaint: true,
+              scale: 4,
+              logging: false,
+              backgroundColor: null
+          });
+          
+          // Create a cropped version focusing on the center
+          const originCanvas = document.createElement('canvas');
+          originCanvas.width = tempOriginCanvas.width;
+          originCanvas.height = tempOriginCanvas.height;
+          const originCtx = originCanvas.getContext('2d');
+          
+          // Calculate crop dimensions (center 60% of the image)
+          const cropWidth = Math.floor(tempOriginCanvas.width * 0.6);
+          const cropHeight = Math.floor(tempOriginCanvas.height * 0.6);
+          const cropX = Math.floor((tempOriginCanvas.width - cropWidth) / 2);
+          const cropY = Math.floor((tempOriginCanvas.height - cropHeight) / 2);
+          
+          // Draw the cropped portion scaled to full size
+          originCtx.drawImage(
+            tempOriginCanvas, 
+            cropX, cropY, cropWidth, cropHeight,
+            0, 0, originCanvas.width, originCanvas.height
+          );
+          
+          // Remove temporary origin marker
+          map.removeLayer(originMarker);
+          
+          // Then, capture destination point closeup
+          map.setView([currentRoutePoints.end.lat, currentRoutePoints.end.lng], 21);
+          // Wait for map to finish panning/zooming
+          await new Promise(resolve => setTimeout(resolve, 1500));
+          
+          // Add a temporary marker for the destination if not already visible
+          const destMarker = L.marker([currentRoutePoints.end.lat, currentRoutePoints.end.lng], {
+            icon: L.divIcon({
+              className: 'custom-div-icon',
+              html: `<div style="background-color: #dc2626; width: 40px; height: 40px; border-radius: 50%; border: 5px solid white; box-shadow: 0 0 15px rgba(0,0,0,0.7);"></div>`,
+              iconSize: [40, 40],
+              iconAnchor: [20, 20]
+            })
+          }).addTo(map);
+          
+          // Create a temporary canvas for cropping
+          const tempDestCanvas = await html2canvas(mapElement, {
+              useCORS: true,
+              allowTaint: true,
+              scale: 4,
+              logging: false,
+              backgroundColor: null
+          });
+          
+          // Create a cropped version focusing on the center
+          const destCanvas = document.createElement('canvas');
+          destCanvas.width = tempDestCanvas.width;
+          destCanvas.height = tempDestCanvas.height;
+          const destCtx = destCanvas.getContext('2d');
+          
+          // Calculate crop dimensions (center 60% of the image)
+          const destCropWidth = Math.floor(tempDestCanvas.width * 0.6);
+          const destCropHeight = Math.floor(tempDestCanvas.height * 0.6);
+          const destCropX = Math.floor((tempDestCanvas.width - destCropWidth) / 2);
+          const destCropY = Math.floor((tempDestCanvas.height - destCropHeight) / 2);
+          
+          // Draw the cropped portion scaled to full size
+          destCtx.drawImage(
+            tempDestCanvas, 
+            destCropX, destCropY, destCropWidth, destCropHeight,
+            0, 0, destCanvas.width, destCanvas.height
+          );
+          
+          // Remove temporary destination marker
+          map.removeLayer(destMarker);
+          
+          // Restore original map view
+          map.setView(originalCenter, originalZoom);
+          
+          // Restore UI elements visibility
+          document.querySelectorAll('.routing-directions-container, .search-container, .search-button-container, .auth-buttons, .map-controls').forEach(el => {
+            if (el) el.style.display = ''; // Reset to default display value
+          });
+          
+          // Restore route line if it existed
+          if (routeLine) {
+            routeLine.addTo(map);
+          }
+          
+          // Draw both images side by side on the combined canvas
+          combinedCtx.drawImage(originCanvas, 0, 0, targetWidth, targetHeight);
+          combinedCtx.drawImage(destCanvas, targetWidth, 0, targetWidth, targetHeight);
+          
+          // Convert combined canvas to base64 image
+          const routeImage = combinedCanvas.toDataURL('image/jpeg', 0.85);
+          
+          // Dismiss previous toast and show a new one
+          toast.dismiss(saveToastId);
+          const newSaveToastId = toast.loading("Saving route...", { position: "bottom-center" });
+          
+          const allRouteData = {};
+          const allRouteGeometry = {};
+          
+          // Add data for each computed route type
+          Object.keys(computedRoutes).forEach(type => {
+              if (computedRoutes[type]) {
+                  allRouteData[type] = computedRoutes[type];
+                  
+                  // Extract geometry for each route type
+                  if (computedRoutes[type].geometry && computedRoutes[type].geometry.coordinates) {
+                      allRouteGeometry[type] = {
+                          coordinates: computedRoutes[type].geometry.coordinates,
+                          color: getRouteLineColor(type),
+                          weight: 5,
+                          opacity: 0.7
+                      };
+                  }
+              }
+          });
+          
+          const saveData = {
+              origin: { place_name: originValue, lat: currentRoutePoints.start.lat, lng: currentRoutePoints.start.lng },
+              destination: { place_name: destinationValue, lat: currentRoutePoints.end.lat, lng: currentRoutePoints.end.lng },
+              route_data: allRouteData, // Save all computed route types
+              route_type: currentType, // Save which one was active
+              route_image: routeImage, // Add the route image
+              route_geometry: allRouteGeometry, // Save geometry for all routes
+              has_multiple_routes: hasMultipleRoutes // Flag indicating if multiple routes are available
+          };
+
           const response = await api.post('/save-route', saveData);
           if (response.data?.success) {
-              toast.success("Route saved successfully!", { id: saveToastId });
+              toast.success("Route saved successfully!", { id: newSaveToastId, position: "bottom-center" });
               fetchSavedRoutesRef.current?.(); // Refresh saved routes list
           } else {
               throw new Error(response.data?.error || "Failed to save route.");
           }
       } catch (error) {
           console.error("Error saving route:", error);
-          toast.error(`Error saving route: ${error.message}`, { id: saveToastId });
+          toast.error(`Error saving route: ${error.message}`, { position: "bottom-center" });
       }
-  }, [user, routeInfo, computedRoutes, currentRoutePoints, originValue, destinationValue]);
+  }, [user, routeInfo, computedRoutes, currentRoutePoints, originValue, destinationValue, map]);
   saveCurrentRouteRef.current = saveCurrentRoute;
 
   // --- Effects ---
@@ -1785,7 +2162,7 @@ function App() {
             // if (hasValidRoutePointsRef.current?.()) {
             //    calculateAllRouteTypesRef.current?.(currentRoutePoints);
             // }
-             toast.info(`Calculating ${selectedType} route...`); // Inform user
+             toast.success(`Calculating ${selectedType} route...`, { position: "bottom-center" }); // Inform user
         }
     };
 
@@ -1805,7 +2182,7 @@ function App() {
       try {
         const response = await api.post('/forgot-password', { email });
         if (response.data?.success) {
-          toast.success('Password reset email sent successfully!');
+          toast.success('Password reset email sent successfully!', { position: "bottom-center" });
           setAuthMode('login');
         } else {
           throw new Error(response.data?.error || 'Failed to send password reset email.');
@@ -1898,53 +2275,53 @@ function App() {
 
          {/* Bottom Left Auth/User Buttons */}
         <div className="auth-buttons">
-          {user ? (
-            <>
-              <button className="user-button" onClick={toggleSavedRoutesRef.current} title="View saved routes">My Routes</button>
-              <button className="logout-button" onClick={handleLogoutRef.current} title="Log out">Logout</button>
-            </>
-          ) : (
-            <div className="user-icon-container">
-              <button 
-                className="user-icon-button" 
-                onClick={() => setShowAuthMenu(prev => !prev)} 
-                title="Account options"
-              >
-                <div className="user-icon">
-                  <img src={UserIcon} alt="User" />
-                </div>
-              </button>
-              {showAuthMenu && (
-                <div className="auth-menu-popup">
-                  <div className="auth-menu-arrow"></div>
-                  <button 
-                    className="auth-menu-option" 
-                    onClick={() => {
-                      setAuthMode('login');
-                      setShowAuthForm(true);
-                      setShowAuthMenu(false);
-                    }}
-                  >
-                    <span className="auth-menu-icon">
-                      <img src={LoginIcon} alt="Login" />
-                    </span> Login
-                  </button>
-                  <button 
-                    className="auth-menu-option" 
-                    onClick={() => {
-                      setAuthMode('register');
-                      setShowAuthForm(true);
-                      setShowAuthMenu(false);
-                    }}
-                  >
-                    <span className="auth-menu-icon">
-                      <img src={RegisterIcon} alt="Register" />
-                    </span> Register
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
+        {user ? (
+          <>
+            <button className="user-button" onClick={toggleSavedRoutesRef.current} title="View saved routes">My Routes</button>
+            <button className="logout-button" onClick={handleLogoutRef.current} title="Log out">Logout</button>
+          </>
+        ) : (
+          <div className="user-icon-container">
+            <button 
+              className="user-icon-button" 
+              onClick={() => setShowAuthMenu(prev => !prev)} 
+              title="Account options"
+            >
+              <div className="user-icon">
+                <img src={UserIcon} alt="User" />
+              </div>
+            </button>
+            {showAuthMenu && (
+              <div className="auth-menu-popup">
+                <div className="auth-menu-arrow"></div>
+                <button 
+                  className="auth-menu-option" 
+                  onClick={() => {
+                    setAuthMode('login');
+                    setShowAuthForm(true);
+                    setShowAuthMenu(false);
+                  }}
+                >
+                  <span className="auth-menu-icon">
+                    <img src={LoginIcon} alt="Login" />
+                  </span> Login
+                </button>
+                <button 
+                  className="auth-menu-option" 
+                  onClick={() => {
+                    setAuthMode('register');
+                    setShowAuthForm(true);
+                    setShowAuthMenu(false);
+                  }}
+                >
+                  <span className="auth-menu-icon">
+                    <img src={RegisterIcon} alt="Register" />
+                  </span> Register
+                </button>
+              </div>
+            )}
+          </div>
+        )}
         </div>
 
         {/* Bottom Right Map Controls */}
@@ -1963,7 +2340,7 @@ function App() {
                 className={`map-control-button route-type-button ${!hasValidRoutePointsRef.current() ? 'disabled' : ''}`}
                 onClick={() => {
                     if (!hasValidRoutePointsRef.current()) {
-                        toast.info("Please set both Origin and Destination first.", { position: "top-center" });
+                        toast.info("Please set both Origin and Destination first.", { position: "bottom-center" });
                         return;
                     }
                     setShowRouteTypeSelection(true); // Always show selection on button click
@@ -1987,8 +2364,7 @@ function App() {
             </button>
         </div>
 
-        {/* --- Panels and Modals ---*/}
-
+        {/* --- Panels and Modals --- */}
         {/* Directions Panel (Minimized State) */}
         {routeDirections && isDirectionsMinimized && (
           <div className="routing-directions-container minimized" 
@@ -1997,7 +2373,8 @@ function App() {
                onMouseLeave={() => preventMapInteractionRef.current()?.()}
                onTouchStart={preventMapInteractionRef.current}
                onTouchEnd={() => preventMapInteractionRef.current()?.()}
-               title="Expand Directions">
+               title="Expand Directions"
+          >
              <div className="routing-directions-header"><div className="directions-toggle-icon">🗺️</div></div>
           </div>
         )}
@@ -2197,25 +2574,36 @@ function App() {
                 <div className="routes-list">
                   {savedRoutes.map((route, index) => (
                      <div key={route._id || index} className="route-item" 
-                          // onClick={() => {
-                          //   // Ensure map interactions are re-enabled before loading route
-                          //   if (map) {
-                          //     map.dragging.enable();
-                          //     map.touchZoom.enable();
-                          //     map.doubleClickZoom.enable();
-                          //     map.scrollWheelZoom.enable();
-                          //     map.boxZoom.enable();
-                          //     map.keyboard.enable();
-                          //     if (map.tap) map.tap.enable();
-                          //   }
-                          //   loadSavedRouteRef.current?.(route);
-                          // }} 
+                          onClick={() => {
+                            // Ensure map interactions are re-enabled before loading route
+                            if (map) {
+                              map.dragging.enable();
+                              map.touchZoom.enable();
+                              map.doubleClickZoom.enable();
+                              map.scrollWheelZoom.enable();
+                              map.boxZoom.enable();
+                              map.keyboard.enable();
+                              if (map.tap) map.tap.enable();
+                            }
+                            // First close the panel
+                            setShowSavedRoutes(false);
+                            setSearchExpanded(false); // Collapse search panel
+                            // Then load the route (after panel is closed)
+                            setTimeout(() => {
+                              loadSavedRouteRef.current?.(route);
+                            }, 50);
+                          }} 
                           title="Load this route"
                           onMouseEnter={preventMapInteractionRef.current}
                           onMouseLeave={() => preventMapInteractionRef.current()?.()}
                           onTouchStart={preventMapInteractionRef.current}
                           onTouchEnd={() => preventMapInteractionRef.current()?.()}
                      >
+                      {route.route_image && (
+                        <div className="route-image">
+                          <img src={route.route_image} alt="Route Map" />
+                        </div>
+                      )}
                       <div className="route-details">
                         <div className="route-points">
                           <div className="route-origin">{route.origin?.place_name || 'Unknown Origin'}</div>

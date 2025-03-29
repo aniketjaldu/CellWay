@@ -216,13 +216,14 @@ def save_route():
     destination = data.get('destination')
     route_data = data.get('route_data')
     route_type = data.get('route_type', 'balanced') # Default if not provided
+    route_image = data.get('route_image') # Get the route image if provided
 
     if not all([origin, destination, route_data]):
         logging.warning("Save route request failed for user %s: Missing required data", user_id)
         return jsonify({'error': 'Missing required data (origin, destination, route_data)'}), 400
 
     try:
-        route_id = models.save_route(user_id, origin, destination, route_data, route_type)
+        route_id = models.save_route(user_id, origin, destination, route_data, route_type, route_image)
         logging.info("Route saved successfully for user %s, route_id: %s", user_id, str(route_id))
         return jsonify({'success': True, 'route_id': str(route_id)})
     except Exception as e:
