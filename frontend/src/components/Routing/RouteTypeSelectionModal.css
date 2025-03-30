@@ -1,0 +1,242 @@
+.route-type-modal-overlay { /* Renamed from .route-type-selection-overlay */
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1500; /* Highest z-index */
+    animation: fadeInModal 0.3s ease; /* Renamed animation */
+  }
+  
+  @keyframes fadeInModal { /* Renamed animation */
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  
+  .route-type-modal-content { /* Renamed from .route-type-selection-content */
+    width: 90%;
+    max-width: 500px;
+    background: white;
+    border-radius: 16px;
+    padding: 25px;
+    box-shadow: 0 5px 30px rgba(0, 0, 0, 0.3);
+  }
+  
+  .route-type-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+  
+  .route-type-modal-header h3 {
+    margin: 0; /* Remove default margin */
+    font-size: 20px;
+    color: #333;
+  }
+  
+  .route-type-modal-close { /* Style close button */
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: background-color 0.2s;
+  }
+  .route-type-modal-close .icon-img.small {
+    width: 16px; /* Control size */
+    height: 16px;
+    display: block;
+    /* Optional: filter for color */
+    /* filter: invert(40%); */
+  }
+  .route-type-modal-close:hover {
+    background-color: rgba(0,0,0,0.08);
+  }
+  .route-type-modal-close:hover .icon-img.small {
+    /* Optional: change filter on hover */
+    filter: invert(10%);
+  }
+  
+  .route-type-modal-description {
+    margin-bottom: 20px;
+    color: #666;
+    font-size: 14px; /* Slightly smaller description */
+  }
+  
+  /* Loading Indicator */
+  .route-type-loading-indicator {
+    text-align: center;
+    padding: 15px;
+    font-style: italic;
+    color: #888;
+    background-color: #f9f9f9;
+    border-radius: 8px;
+    margin-bottom: 20px;
+  }
+  
+  /* Route Options */
+  .route-selection-options {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+  }
+  
+  .route-selection-option {
+    display: flex;
+    align-items: center;
+    padding: 18px 16px;
+    background-color: #f8f9fa;
+    border: 1px solid #e0e0e0;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-align: left;
+  }
+  
+  .route-selection-option:hover:not(:disabled) {
+    background-color: #e8f4ff;
+    transform: translateY(-2px);
+    border-color: #2A93EE;
+    box-shadow: 0 4px 12px rgba(42, 147, 238, 0.2);
+  }
+  
+  .route-selection-option.active { /* Style for currently selected type */
+    background-color: #e0f0ff; /* Slightly different background */
+    border-color: #1a81d6; /* Darker border */
+    box-shadow: 0 2px 8px rgba(42, 147, 238, 0.15);
+  }
+  
+  .route-selection-option.available:not(.active):not(:disabled) { /* Subtle hint for available */
+    /* Optional: Add a subtle border or shadow */
+    /* border-color: #a5d6a7; */
+  }
+  
+  .route-selection-icon {
+    font-size: 24px;
+    margin-right: 15px;
+    min-width: 30px;
+    text-align: center;
+    color: #555; /* Default icon color */
+  }
+  .route-selection-option.active .route-selection-icon {
+    color: #1a81d6; /* Color for active icon */
+  }
+  
+  
+  .route-selection-label {
+    font-weight: 600;
+    font-size: 16px;
+    color: #333;
+    flex: 1; /* Take available space */
+  }
+  
+  .route-selection-desc {
+    font-size: 14px;
+    color: #777;
+    margin-left: auto; /* Push to the right */
+    white-space: nowrap; /* Prevent wrapping */
+  }
+  
+  .route-selection-option .calculating {
+    color: #888;
+    font-style: italic;
+    font-size: 12px;
+  }
+  
+  /* Disabled State */
+  .route-selection-option:disabled,
+  .route-selection-option.unavailable { /* Style unavailable state */
+    opacity: 0.6;
+    cursor: not-allowed;
+    background-color: #f5f5f5;
+    border-color: #ddd;
+    pointer-events: none; /* Prevent clicks */
+  }
+  
+  .route-selection-option:disabled:hover { /* Remove hover effect when disabled */
+    transform: none;
+    box-shadow: none;
+    border-color: #ddd;
+  }
+  
+  .route-selection-option:disabled .route-selection-icon,
+  .route-selection-option:disabled .route-selection-label,
+  .route-selection-option:disabled .route-selection-desc,
+  .route-selection-option.unavailable .route-selection-icon,
+  .route-selection-option.unavailable .route-selection-label,
+  .route-selection-option.unavailable .route-selection-desc {
+    color: #999; /* Grey out text */
+  }
+  
+  .route-selection-option:disabled .calculating,
+  .route-selection-option.unavailable .calculating {
+    color: #aaa; /* Lighter grey for calculating text when disabled */
+  }
+  
+  
+  /* "Don't ask again" Toggle */
+  .route-selection-dont-ask {
+    margin: 20px 0 10px; /* Adjust margin */
+    text-align: center;
+  }
+  
+  .dont-ask-label {
+    display: inline-flex; /* Use inline-flex for better alignment */
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    user-select: none;
+    padding: 5px; /* Add padding for easier clicking */
+  }
+  
+  .dont-ask-label input[type="checkbox"] {
+    margin-right: 8px;
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+    accent-color: #2A93EE; /* Style checkbox color */
+  }
+  
+  .dont-ask-text {
+    font-size: 14px;
+    color: #666;
+    transition: color 0.2s;
+  }
+  
+  /* When checkbox is checked, highlight the text */
+  .dont-ask-label input[type="checkbox"]:checked + .dont-ask-text {
+    color: #2A93EE; /* Use theme color */
+    font-weight: 500;
+  }
+  
+  /* Optional Actions */
+  .route-selection-actions {
+    margin-top: 20px;
+    display: flex;
+    justify-content: flex-end;
+  }
+  
+  .route-selection-cancel {
+    padding: 10px 20px;
+    background-color: #f5f5f5;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    color: #555;
+    font-size: 14px;
+  }
+  
+  .route-selection-cancel:hover {
+    background-color: #e0e0e0;
+  }

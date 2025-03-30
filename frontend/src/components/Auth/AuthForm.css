@@ -1,0 +1,239 @@
+.auth-form-overlay {
+    position: fixed; /* Use fixed to cover viewport */
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 1100; /* High z-index */
+    animation: fadeInAuth 0.3s ease; /* Renamed animation */
+  }
+  
+  @keyframes fadeInAuth { /* Renamed animation */
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  
+  .auth-form-container { /* Renamed from .auth-form */
+    width: 90%;
+    max-width: 400px;
+    background-color: white;
+    border-radius: 12px;
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
+    overflow: hidden; /* Clip content */
+    display: flex; /* Use flex for layout */
+    flex-direction: column;
+  }
+  
+  .auth-form-header {
+    padding: 15px 20px;
+    background-color: #f7f7f7;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #eee; /* Add border */
+    flex-shrink: 0;
+  }
+  
+  .auth-form-header h2 {
+    margin: 0;
+    font-size: 18px;
+    color: #333;
+  }
+  
+  .auth-close-button { /* Renamed from .close-button */
+    border: none;
+    background: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: #666;
+    padding: 0; /* Remove padding */
+    width: 30px; /* Set size */
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%; /* Make it round */
+    transition: background-color 0.2s;
+  }
+  .auth-close-button .icon-img.small {
+    width: 16px; /* Control size */
+    height: 16px;
+    display: block;
+    /* Optional: filter for color */
+    /* filter: invert(40%); */ /* Example: make it grey */
+  }
+  .auth-close-button:hover {
+    background-color: rgba(0,0,0,0.08);
+    color: #000; /* Darken icon on hover */
+  }
+  .auth-close-button:hover .icon-img.small {
+    filter: invert(10%); /* Example: make it darker */
+  }
+  
+  
+  .auth-form-error,
+  .auth-form-message {
+    margin: 10px 20px 0; /* Margin top only */
+    padding: 10px;
+    border-radius: 5px;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+  .auth-form-error {
+    background-color: #ffebee;
+    color: #d32f2f;
+    border: 1px solid #e57373; /* Add border */
+  }
+  .auth-form-message {
+    background-color: #e8f5e9;
+    color: #388e3c;
+    border: 1px solid #a5d6a7; /* Add border */
+  }
+  
+  
+  .auth-form-body { /* Renamed from form */
+    padding: 20px;
+    overflow-y: auto; /* Allow scrolling if content overflows */
+  }
+  
+  .form-group {
+    margin-bottom: 15px;
+    position: relative; /* Needed for password toggle */
+  }
+  
+  .form-group label {
+    display: block;
+    margin-bottom: 5px;
+    color: #666;
+    font-size: 14px;
+    font-weight: 500; /* Slightly bolder label */
+  }
+  
+  .form-group input {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 14px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .form-group input:focus {
+    outline: none;
+    border-color: #2A93EE;
+    box-shadow: 0 0 0 2px rgba(42, 147, 238, 0.3);
+  }
+  .form-group input:disabled {
+    background-color: #f5f5f5;
+    cursor: not-allowed;
+  }
+  
+  
+  /* Password Input Specifics */
+  .password-input-container { /* Wrapper for input + toggle */
+    position: relative;
+  }
+  .form-group .password-input-container input { /* Ensure password input has padding */
+    padding-right: 40px;
+  }
+  
+  .password-visibility-toggle {
+    position: absolute;
+    right: 1px; /* Position inside the input border */
+    top: 1px;   /* Position inside the input border */
+    bottom: 1px;/* Position inside the input border */
+    width: 38px; /* Width for the button */
+    background: transparent;
+    border: none;
+    border-radius: 0 7px 7px 0; /* Match input radius */
+    cursor: pointer;
+    padding: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 5;
+    transition: background-color 0.2s;
+  }
+  
+  .password-visibility-toggle:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+  }
+  .password-visibility-toggle:focus {
+    outline: none; /* Remove default focus */
+    background-color: rgba(42, 147, 238, 0.1); /* Subtle focus */
+  }
+  
+  .eye-icon {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    opacity: 0.6; /* Slightly dim icon */
+  }
+  .password-visibility-toggle:hover .eye-icon {
+    opacity: 0.9;
+  }
+  
+  /* Eye icon SVGs (embedded as data URIs) */
+  .eye-icon.visible {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z'%3E%3C/path%3E%3Ccircle cx='12' cy='12' r='3'%3E%3C/circle%3E%3C/svg%3E");
+  }
+  .eye-icon.hidden {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24'%3E%3C/path%3E%3Cline x1='1' y1='1' x2='23' y2='23'%3E%3C/line%3E%3C/svg%3E");
+  }
+  
+  
+  .form-actions {
+    margin-top: 20px;
+  }
+  
+  .submit-button {
+    width: 100%;
+    padding: 12px;
+    background-color: #2A93EE;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: 500; /* Make submit button text slightly bolder */
+    transition: background-color 0.3s, opacity 0.3s;
+  }
+  
+  .submit-button:hover:not(:disabled) {
+    background-color: #1a81d6;
+  }
+  .submit-button:disabled {
+    background-color: #a0cff8; /* Lighter blue when disabled */
+    cursor: not-allowed;
+    opacity: 0.7;
+  }
+  
+  .auth-switch-links { /* Renamed from .auth-switch */
+    margin-top: 20px; /* Increased margin */
+    text-align: center;
+    font-size: 14px;
+    color: #666;
+    display: flex; /* Layout links */
+    flex-direction: column;
+    gap: 8px; /* Space between links */
+  }
+  
+  .auth-switch-links button {
+    background: none;
+    border: none;
+    color: #2A93EE;
+    cursor: pointer;
+    text-decoration: underline;
+    padding: 0 5px;
+    font-size: 14px; /* Ensure consistent font size */
+  }
+  .auth-switch-links button:hover {
+    color: #1a81d6;
+    text-decoration: none; /* Remove underline on hover */
+  }

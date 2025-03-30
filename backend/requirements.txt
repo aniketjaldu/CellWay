@@ -1,5 +1,5 @@
-flask==3.1.0
-werkzeug==3.1.0
+flask==3.0.3
+werkzeug==3.0.3
 flask-cors==3.0.10
 flask-session==0.5.0
 requests==2.31.0

@@ -1,0 +1,242 @@
+.directions-panel-container {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 400px; /* Default width */
+    max-width: 90vw; /* Max width on smaller screens */
+    max-height: calc(100vh - 20px); /* Max height */
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
+    z-index: 900; /* Below modals, above map controls? */
+    overflow: hidden; /* Prevent content overflow */
+    transition: all 0.4s cubic-bezier(0.2, 0, 0.2, 1); /* Smooth transitions */
+    pointer-events: auto; /* Allow interaction */
+  }
+  
+  /* Minimized State */
+  .directions-panel-container.minimized {
+    width: 50px;
+    height: 50px;
+    overflow: hidden;
+    border-radius: 25px; /* Circular */
+    background-color: white;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    cursor: pointer;
+    padding: 0; /* Remove padding */
+  }
+  
+  .directions-panel-container.minimized .directions-panel-header {
+    padding: 0;
+    border: none;
+    height: 100%;
+    width: 100%;
+    justify-content: center; /* Center the icon */
+  }
+  
+  .directions-toggle-icon { /* Icon in minimized state */
+    color: #333;
+    font-size: 22px;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  /* Header */
+  .directions-panel-header {
+    padding: 10px 15px;
+    background-color: #f8f8f8;
+    border-bottom: 1px solid #eee;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0; /* Prevent header shrinking */
+    min-height: 50px; /* Ensure consistent height */
+  }
+  
+  .directions-title {
+    flex: 1; /* Take available space */
+    overflow: hidden; /* Prevent long names breaking layout */
+    margin-right: 10px; /* Space before actions */
+  }
+  
+  .direction-endpoints {
+    display: flex;
+    font-size: 14px;
+    align-items: center;
+    white-space: nowrap;
+    overflow: hidden;
+    gap: 4px;
+  }
+  
+  .direction-origin, .direction-destination {
+    max-width: 140px; /* Limit width */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-weight: 600;
+    white-space: nowrap;
+    padding: 4px 8px;
+    border-radius: 4px;
+    color: white;
+  }
+  
+  .direction-origin { background-color: #2A93EE; }
+  .direction-destination { background-color: #EE2A2A; }
+  .direction-separator { margin: 0 4px; color: #666; font-size: 16px; }
+  
+  .directions-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  
+  .directions-action-button {
+    background: none;
+    border: none;
+    font-size: 18px;
+    cursor: pointer;
+    padding: 5px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.2s;
+    color: #666; /* Default icon color */
+  }
+  
+  .directions-action-button:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+  }
+  
+  .directions-action-button.save-button {
+    font-size: 16px; /* Adjust if using icon font/SVG */
+  }
+  .directions-action-button.minimize-button {
+    font-weight: bold; /* Make dash thicker */
+  }
+  
+  /* Content Area */
+  .directions-panel-content {
+    overflow: hidden; /* Hide overflow, scrolling handled by inner container */
+    display: flex;
+    flex-direction: column;
+    flex: 1; /* Take remaining height */
+    /* max-height calculation removed, flex handles it */
+  }
+  
+  .directions-summary {
+    padding: 10px 15px;
+    background-color: #f8f8f8;
+    border-bottom: 1px solid #eee;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    font-size: 13px;
+    flex-shrink: 0; /* Prevent summary shrinking */
+  }
+  
+  .directions-summary > div {
+    margin-right: 10px; /* Spacing between items */
+  }
+  
+  /* Instruction List */
+  .instruction-list-container {
+    overflow-y: auto; /* Enable vertical scrolling */
+    flex: 1; /* Take remaining space */
+    padding: 0 5px 0 15px; /* Padding left/right */
+    margin: 0;
+    /* Ensure this container doesn't interfere with map interactions */
+    touch-action: pan-y;
+    -ms-touch-action: pan-y;
+    scrollbar-width: thin;
+    scrollbar-color: #a8a8a8 #f1f1f1;
+  }
+  .instruction-list-container::-webkit-scrollbar { width: 8px; }
+  .instruction-list-container::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
+  .instruction-list-container::-webkit-scrollbar-thumb { background-color: #a8a8a8; border-radius: 4px; border: 2px solid #f1f1f1; }
+  .instruction-list-container::-webkit-scrollbar-thumb:hover { background-color: #8a8a8a; }
+  
+  .instruction-list {
+    list-style: none;
+    padding: 10px 0; /* Padding top/bottom */
+    margin: 0;
+  }
+  
+  .instruction-item {
+    padding: 12px 10px 12px 0; /* Adjust padding */
+    margin-bottom: 8px;
+    display: flex;
+    align-items: flex-start;
+    border-bottom: 1px solid #f5f5f5;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    border-radius: 6px;
+  }
+  .instruction-item:last-child {
+    border-bottom: none;
+  }
+  
+  .instruction-item:hover,
+  .instruction-item:focus { /* Add focus style */
+    background-color: #f0f7ff;
+    outline: none; /* Remove default focus outline if custom style is applied */
+  }
+  
+  .instruction-item.active {
+    background-color: #e3f2fd;
+    border-left: 3px solid #2A93EE;
+    padding-left: 7px; /* Adjust padding to account for border */
+  }
+  
+  .instruction-icon {
+    min-width: 32px;
+    width: 32px;
+    height: 32px;
+    margin-right: 10px;
+    background: #f0f0f0;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    color: #333;
+    flex-shrink: 0;
+  }
+  
+  /* Icon background colors (reuse from App.css) */
+  .icon-straight, .icon-continue { background-color: #2a93ee1a; color: #2A93EE; }
+  .icon-right, .icon-slight-right, .icon-sharp-right { background-color: #0f9d581a; color: #0F9D58; }
+  .icon-left, .icon-slight-left, .icon-sharp-left { background-color: #ea43351a; color: #EA4335; }
+  .icon-uturn, .icon-uturn-left, .icon-uturn-right { background-color: #fbbc051a; color: #FBBC05; }
+  .icon-roundabout, .icon-rotary, .icon-exit-roundabout { background-color: #9c27b01a; color: #9C27B0; }
+  .icon-arrive, .icon-destination { background-color: #ee2a2a1a; color: #EE2A2A; }
+  .icon-depart, .icon-start { background-color: #2a93ee1a; color: #2A93EE; }
+  /* Add other icon types as needed */
+  .icon-default { background-color: #f1f1f1; color: #757575; }
+  
+  .instruction-text {
+    flex: 1;
+    min-width: 0; /* Allow text to wrap */
+  }
+  
+  .instruction-direction {
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 4px;
+    color: #333;
+  }
+  
+  .instruction-distance {
+    font-size: 12px;
+    color: #666;
+    margin-bottom: 2px;
+  }
+  
+  .instruction-item.no-directions .instruction-text {
+    color: #888;
+    font-style: italic;
+  }

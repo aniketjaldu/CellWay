@@ -1,0 +1,84 @@
+.map-controls-container { /* Renamed from .map-controls */
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    z-index: 1000; /* Above map, potentially below modals */
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .map-control-button {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    background: white;
+    border: none;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 22px; /* Icon size */
+    padding: 0;
+    color: #333;
+  }
+  
+  .map-control-button:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  }
+  
+  /* Active state (e.g., tower toggle) */
+  .map-control-button.active {
+    background-color: #2A93EE;
+    color: white;
+    box-shadow: 0 4px 12px rgba(42, 147, 238, 0.3);
+  }
+  
+  /* Disabled state */
+  .map-control-button.disabled {
+    background-color: #e0e0e0;
+    color: #999;
+    cursor: not-allowed;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  }
+  
+  .map-control-button.disabled:hover {
+    transform: none;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  }
+  
+  /* Locate button specific styles */
+  .locate-button {
+    /* Base style is map-control-button */
+  }
+  
+  .locate-button.locating {
+    animation: pulseLocate 1.5s infinite; /* Renamed animation */
+  }
+  
+  @keyframes pulseLocate { /* Renamed animation */
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
+  }
+  
+  /* Route type button specific styles */
+  .route-type-button {
+    /* Base style is map-control-button */
+    font-size: 20px; /* Adjust emoji size if needed */
+    background-color: #fff; /* Ensure default background */
+    transition: all 0.3s ease;
+  }
+  
+  .route-type-button:hover:not(.disabled) { /* Only apply hover if not disabled */
+    background-color: #e8f4ff;
+    transform: scale(1.05);
+  }
+  
+  /* Tower toggle button specific styles */
+  .tower-toggle-button {
+     /* Base style is map-control-button */
+  }

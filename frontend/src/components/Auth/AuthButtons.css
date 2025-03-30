@@ -1,0 +1,141 @@
+.auth-buttons-container {
+    position: absolute;
+    bottom: 20px;
+    left: 20px;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .auth-button {
+    padding: 8px 15px;
+    border-radius: 12px;
+    background: white;
+    border: none;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.3s ease;
+    color: #333;
+    display: flex; /* Added for icon alignment if needed */
+    align-items: center; /* Added for icon alignment */
+    justify-content: center; /* Added for icon alignment */
+  }
+
+  .auth-button:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+  }
+
+  .my-routes-button { /* Was .user-button */
+    background-color: #2A93EE;
+    color: white;
+  }
+
+  .logout-button {
+    background-color: #f5f5f5;
+  }
+
+  /* User icon and auth menu styles */
+  .user-icon-container {
+    position: relative;
+  }
+
+  .user-icon-button {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    padding: 0;
+  }
+  
+  /* Style for the image inside the user icon button */
+  .user-icon-button .icon-img {
+    width: 22px; /* Control size */
+    height: 22px;
+    display: block; /* Remove extra space below image */
+    /* Optional: Use filter to change color if SVGs are single-color */
+    /* filter: invert(20%); */
+  }
+
+  .auth-menu-popup {
+    position: absolute;
+    bottom: 55px; /* Position above the button */
+    left: 0;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 120px;
+    z-index: 1001;
+    animation: popup-fade-in 0.2s ease-out;
+  }
+
+  .auth-menu-arrow {
+    position: absolute;
+    bottom: -8px; /* Position below the popup */
+    left: 18px; /* Align with button */
+    width: 16px;
+    height: 16px;
+    background: white;
+    transform: rotate(45deg);
+    box-shadow: 4px 4px 5px rgba(0, 0, 0, 0.1); /* Adjust shadow */
+    z-index: -1; /* Behind popup content */
+  }
+
+  .auth-menu-option {
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: transparent;
+    border: none;
+    text-align: left;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    color: #333;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .auth-menu-icon { /* Target the SVG component */
+    width: 16px;
+    height: 16px;
+    fill: #333; /* Use fill for SVGs */
+  }
+
+  /* Wrapper for menu icons if needed for alignment/spacing */
+.auth-menu-icon-wrapper {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px; /* Match desired icon size */
+    height: 16px;
+  }
+  
+  /* Style for the small images inside the menu options */
+  .auth-menu-option .icon-img.small {
+    width: 16px; /* Control size */
+    height: 16px;
+    display: block;
+    /* Optional: Use filter to change color */
+    /* filter: invert(20%); */
+  }
+
+  .auth-menu-option:hover {
+    background-color: #f0f0f0;
+  }
+
+  @keyframes popup-fade-in {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }

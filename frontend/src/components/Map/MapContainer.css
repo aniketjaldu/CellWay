@@ -1,0 +1,26 @@
+.map-container {
+    height: 100vh; /* Takes full viewport height */
+    width: 100%;   /* Takes full viewport width */
+    position: absolute; /* Positioned relative to app-container */
+    top: 0;
+    left: 0;
+    z-index: 0; /* Base layer, other UI elements will be on top */
+    background-color: #f0f0f0; /* Fallback background before tiles load */
+  }
+  
+  /* Style for when map interactions are disabled by overlays */
+  /* This class might be added dynamically by useMapInteraction or App component */
+  .map-container.map-interactions-disabled {
+    cursor: default;
+  }
+  
+  /* Ensure Leaflet controls render correctly above the map tiles */
+  /* You might need to adjust z-index based on your other overlay components */
+  .map-container .leaflet-control-container {
+     z-index: 500; /* Example: Ensure controls are above tiles but below panels */
+  }
+  
+  /* Ensure popups are above map controls */
+  .map-container .leaflet-popup-pane {
+      z-index: 600; /* Example: Above controls */
+  }

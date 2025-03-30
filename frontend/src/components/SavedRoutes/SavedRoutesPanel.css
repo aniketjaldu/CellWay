@@ -1,0 +1,198 @@
+.saved-routes-overlay {
+    position: fixed; /* Use fixed to cover viewport */
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 1050; /* Above search/controls, below auth form? */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    animation: fadeInSavedRoutes 0.3s ease; /* Renamed animation */
+  }
+  
+  @keyframes fadeInSavedRoutes { /* Renamed animation */
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  
+  .saved-routes-container { /* Renamed from .saved-routes */
+    background-color: white;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 500px;
+    max-height: 80vh; /* Limit height */
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    display: flex; /* Use flex for layout */
+    flex-direction: column;
+    overflow: hidden; /* Prevent content breaking border radius */
+  }
+  
+  .saved-routes-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 20px; /* Consistent padding */
+    border-bottom: 1px solid #e0e0e0;
+    flex-shrink: 0; /* Prevent header shrinking */
+  }
+  
+  .saved-routes-header h2 {
+    margin: 0;
+    font-size: 1.25rem; /* Adjusted size */
+    color: #333;
+  }
+  
+  .saved-routes-close-button { /* Renamed from .close-button */
+    background: none;
+    border: none;
+    font-size: 1.5rem; /* Icon size */
+    cursor: pointer;
+    color: #666;
+    padding: 0;
+    margin: 0;
+    line-height: 1;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: background-color 0.2s;
+  }
+  .saved-routes-close-button .icon-img.small {
+    width: 16px; /* Control size */
+    height: 16px;
+    display: block;
+    /* Optional: filter for color */
+    /* filter: invert(40%); */
+  }
+  .saved-routes-close-button:hover {
+    background-color: rgba(0,0,0,0.08);
+    color: #000;
+  }
+  .saved-routes-close-button:hover .icon-img.small {
+    /* Optional: change filter on hover */
+    filter: invert(10%);
+  }
+  
+  .saved-routes-content {
+    overflow-y: auto; /* Enable scrolling for content */
+    padding: 20px; /* Padding for the list */
+    flex-grow: 1; /* Allow content to take available space */
+  }
+  
+  .routes-list {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+  }
+  
+  .route-item {
+    background-color: #f9f9f9;
+    border-radius: 6px;
+    padding: 15px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 1px solid #e0e0e0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .route-item:hover,
+  .route-item:focus { /* Add focus style */
+    background-color: #f0f0f0;
+    transform: translateY(-2px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    outline: none; /* Remove default focus outline */
+    border-color: #ccc; /* Slightly darker border on hover */
+  }
+  
+  .route-image {
+    width: 100%;
+    height: 150px; /* Fixed height for consistency */
+    overflow: hidden;
+    border-radius: 4px;
+    margin-bottom: 10px;
+    border: 1px solid #ddd;
+    background-color: #eee; /* Placeholder background */
+  }
+  
+  .route-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover; /* Cover the area */
+    display: block;
+  }
+  
+  .route-details {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .route-points {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+  
+  .route-origin,
+  .route-destination {
+    font-weight: 600;
+    position: relative;
+    padding-left: 20px; /* Space for icon */
+    line-height: 1.3; /* Adjust line height */
+    overflow: hidden; /* Prevent long names breaking layout */
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  
+  .route-origin { color: #2563eb; }
+  .route-destination { color: #dc2626; }
+  
+  .route-origin::before,
+  .route-destination::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+  }
+  .route-origin::before { background-color: #2563eb; }
+  .route-destination::before { background-color: #dc2626; }
+  
+  .route-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 5px;
+    font-size: 0.85rem;
+    color: #666;
+  }
+  
+  .route-type {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    text-transform: capitalize;
+  }
+  
+  .route-date {
+    font-style: italic;
+  }
+  
+  .saved-routes-message { /* Renamed from .no-routes */
+    text-align: center;
+    padding: 20px;
+    color: #666;
+  }
+  .saved-routes-message.error {
+    color: #d32f2f;
+    font-weight: 500;
+  }
