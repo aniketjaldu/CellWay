@@ -30,7 +30,7 @@ api.interceptors.response.use(
       // Optionally trigger logout state change here if using a state manager
     } else if (status === 403) {
       // Forbidden
-      toast.error("You don't have permission to perform this action.", { id: 'forbidden-error' });
+      // toast.error("You don't have permission to perform this action.", { id: 'forbidden-error' });
     } else if (status === 500 || status === 503) {
       // Server errors
       toast.error("Server error occurred. Please try again later.", { id: 'server-error' });
