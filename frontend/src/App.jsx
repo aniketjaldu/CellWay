@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import L from 'leaflet'; // Import Leaflet if needed for types or direct use
 
@@ -20,6 +21,7 @@ import MapControls from './components/Map/MapControls';
 import RouteTypeSelectionModal from './components/Routing/RouteTypeSelectionModal';
 import TowerMarkers from './components/Map/TowerMarkers'; 
 import RouteHighlight from './components/Map/RouteHighlight';
+import ResetPasswordForm from './components/Auth/ResetPasswordForm';
 
 // Base Styles
 import './App.css';
@@ -133,7 +135,7 @@ function App() {
                     max_lat: currentMapBounds.getNorthEast().lat,
                     max_lng: currentMapBounds.getNorthEast().lng,
                 };
-                console.log("[App handleLoadSavedRoute] Triggering fetchTowersInBounds for bounds:", apiBounds);
+                // console.log("[App handleLoadSavedRoute] Triggering fetchTowersInBounds for bounds:", apiBounds);
                 await fetchTowersInBounds(apiBounds); // Await if needed
             } else {
                  console.warn("[App handleLoadSavedRoute] Map bounds not available after loading route.");
@@ -157,7 +159,8 @@ function App() {
     // console.log(`[handleInputChange] isOrigin: ${isOrigin}, value: ${value}`);
     setValue(value);
     if (!value.trim() || !mapTilerKey) {
-      setSuggestions([]); setShowSuggestionsFn(false); console.log(`[handleInputChange] No value or no mapTilerKey, suggestions cleared, showSuggestions set to false`); return;
+      setSuggestions([]); setShowSuggestionsFn(false); 
+      // console.log(`[handleInputChange] No value or no mapTilerKey, suggestions cleared, showSuggestions set to false`); return;
     }
     try {
       const response = await fetch(`https://api.maptiler.com/geocoding/${encodeURIComponent(value)}.json?key=${mapTilerKey}&autocomplete=true&limit=5`);
@@ -171,24 +174,24 @@ function App() {
   }, [mapTilerKey]);
 
   const handleInputFocus = useCallback(async (isOrigin) => {
-    console.log(`[handleInputFocus] isOrigin: ${isOrigin} - Function called`);
+    // console.log(`[handleInputFocus] isOrigin: ${isOrigin} - Function called`);
     const suggestions = isOrigin ? originSuggestions : destinationSuggestions;
     const setShow = isOrigin ? setShowOriginSuggestions : setShowDestinationSuggestions;
     const inputValue = isOrigin ? originValue : destinationValue;
 
     if (inputValue) { // If input has a value (e.g., loaded route name)
       // Programmatically trigger suggestion fetch for the current value
-      console.log(`[handleInputFocus] Input has value: ${inputValue}, isOrigin: ${isOrigin} - Calling handleInputChange`);
+      // console.log(`[handleInputFocus] Input has value: ${inputValue}, isOrigin: ${isOrigin} - Calling handleInputChange`);
       const mockEvent = { target: { value: inputValue } }; // Create a mock event
       await handleInputChange(mockEvent, isOrigin); // Call handleInputChange
       setShow(true); // Ensure suggestions dropdown is shown
-      console.log(`[handleInputFocus] After handleInputChange, showSuggestions set to true (isOrigin: ${isOrigin}), showOriginSuggestions: ${showOriginSuggestions}, showDestinationSuggestions: ${showDestinationSuggestions}`);
+      // console.log(`[handleInputFocus] After handleInputChange, showSuggestions set to true (isOrigin: ${isOrigin}), showOriginSuggestions: ${showOriginSuggestions}, showDestinationSuggestions: ${showDestinationSuggestions}`);
     } else if (suggestions.length > 0) { // Fallback to original logic if input is empty but suggestions exist
       setShow(true);
-      console.log(`[handleInputFocus] After handleInputChange, showSuggestions set to true (isOrigin: ${isOrigin}), showOriginSuggestions: ${showOriginSuggestions}, showDestinationSuggestions: ${showDestinationSuggestions}`);
+      // console.log(`[handleInputFocus] After handleInputChange, showSuggestions set to true (isOrigin: ${isOrigin}), showOriginSuggestions: ${showOriginSuggestions}, showDestinationSuggestions: ${showDestinationSuggestions}`);
     } else {
         setShow(true); // if no value but want to show empty suggestion, setShow(true) always
-        console.log(`[handleInputFocus] Input empty and no existing suggestions, showSuggestions set to true (isOrigin: ${isOrigin}), showOriginSuggestions: ${showOriginSuggestions}, showDestinationSuggestions: ${showDestinationSuggestions}`);
+        // console.log(`[handleInputFocus] Input empty and no existing suggestions, showSuggestions set to true (isOrigin: ${isOrigin}), showOriginSuggestions: ${showOriginSuggestions}, showDestinationSuggestions: ${showDestinationSuggestions}`);
     }
   }, [originSuggestions, destinationSuggestions, originValue, destinationValue, handleInputChange, showOriginSuggestions, showDestinationSuggestions]);
 
@@ -358,6 +361,11 @@ function App() {
     saveCurrentRoute(mapContainerRef.current);
   }, [saveCurrentRoute, mapContainerRef]);
 
+  const openAuthModal = (mode) => {
+    setAuthMode(mode);
+    setShowAuthForm(true);
+}
+
   // --- Render Logic ---
   return (
     <div className="app-container">
@@ -441,8 +449,8 @@ function App() {
       {/* Auth Buttons */}
       <AuthButtons
         user={user}
-        onLoginClick={() => { setAuthMode('login'); setShowAuthForm(true); }}
-        onRegisterClick={() => { setAuthMode('register'); setShowAuthForm(true); }}
+        onLoginClick={() => { openAuthModal('login'); }}
+        onRegisterClick={() => { openAuthModal('register'); }}
         onLogoutClick={logout}
         onMyRoutesClick={() => setShowSavedRoutes(true)}
       />
@@ -492,11 +500,10 @@ function App() {
         <AuthForm
           mode={authMode}
           onClose={() => setShowAuthForm(false)}
-          onLogin={login} // Pass login/register/forgotPassword from useAuth hook
+          onLogin={login}
           onRegister={register}
           onForgotPassword={forgotPassword}
           onChangeMode={setAuthMode}
-          // No map interaction props needed as overlay handles it
         />
       )}
 
@@ -526,6 +533,20 @@ function App() {
             // No map interaction props needed as overlay handles it
          />
       )}
+      {/* --- Define Routes for Pages/Overlays --- */}
+      <Routes>
+          {/* Define the root path - renders nothing extra as main UI is outside */}
+          <Route path="/" element={null} />
+
+          {/* Define the reset password path */}
+          <Route
+              path="/reset-password"
+              element={<ResetPasswordForm />}
+          />
+
+          {/* Optional: Define a catch-all for unknown routes */}
+          {/* <Route path="*" element={<NotFoundComponent />} /> */}
+        </Routes>
 
     </div>
   );

@@ -390,7 +390,7 @@ export const useRouting = (map, user, mapUtils) => {
       toast.error("Could not load the selected route.");
       return;
     }
-    console.log("loadSavedRoute: Loading route:", route._id);
+    // console.log("loadSavedRoute: Loading route:", route._id);
 
     clearRoutingState();
 
@@ -400,10 +400,10 @@ export const useRouting = (map, user, mapUtils) => {
     const destName = route.destination.place_name || `${route.destination.lat.toFixed(5)}, ${route.destination.lng.toFixed(5)}`;
     const savedActiveType = route.route_type || 'balanced';
 
-    console.log("loadSavedRoute: originName:", originName, "destName:", destName); 
-    console.log("loadSavedRoute: mapUtils:", mapUtils);
-    console.log("loadSavedRoute: mapUtils.setOriginValue:", mapUtils?.setOriginValue);
-    console.log("loadSavedRoute: mapUtils.setDestinationValue:", mapUtils?.setDestinationValue);
+    // console.log("loadSavedRoute: originName:", originName, "destName:", destName); 
+    // console.log("loadSavedRoute: mapUtils:", mapUtils);
+    // console.log("loadSavedRoute: mapUtils.setOriginValue:", mapUtils?.setOriginValue);
+    // console.log("loadSavedRoute: mapUtils.setDestinationValue:", mapUtils?.setDestinationValue);
 
 
     // Update Search Bar Values

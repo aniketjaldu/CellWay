@@ -5,6 +5,7 @@ and sets up logging.
 """
 from flask import Flask, jsonify
 from flask_cors import CORS
+from flask_mail import Mail
 import logging
 import secrets
 import os
@@ -13,11 +14,7 @@ import os
 from config import Config # Absolute import
 
 # --- Blueprints ---
-# Use absolute imports from the backend package
-from routes.auth_routes import auth_bp
-from routes.geo_routes import geo_bp
-from routes.routing_routes import routing_bp
-from routes.tower_routes import tower_bp
+# Use absolute imports from the backend packag
 
 # --- Logging Setup ---
 # Configure logging early
@@ -27,6 +24,9 @@ logging.basicConfig(
     datefmt='%Y-%m-%d %H:%M:%S'
 )
 log = logging.getLogger(__name__) # Get logger for this module
+
+# --- Flask-Mail Setup ---
+mail = Mail()
 
 # --- App Initialization ---
 def create_app(config_class=Config):
@@ -38,6 +38,12 @@ def create_app(config_class=Config):
     app.config.from_object(config_class)
     log.info(f"App configured with {config_class.__name__}")
 
+    # --- Check for necessary Mail config ---
+    if not all([app.config.get('MAIL_SERVER'), app.config.get('MAIL_USERNAME'), app.config.get('MAIL_PASSWORD')]):
+         log.warning("MAIL_SERVER, MAIL_USERNAME, or MAIL_PASSWORD not fully configured. Email sending will likely fail.")
+    if not app.config.get('MAIL_DEFAULT_SENDER'):
+         log.warning("MAIL_DEFAULT_SENDER not configured.")
+
     # Ensure instance folder exists for potential session files etc.
     try:
         os.makedirs(app.instance_path, exist_ok=True)
@@ -48,9 +54,12 @@ def create_app(config_class=Config):
     # Use SECRET_KEY from config, fallback to generating one (less ideal for prod)
     app.secret_key = app.config.get('SECRET_KEY') or secrets.token_hex(16)
     if not app.config.get('SECRET_KEY'):
-            log.warning("SECRET_KEY not set in config, using a randomly generated key. "
-                        "Sessions will be invalidated on app restart.")
+        log.warning("SECRET_KEY not set in config, using a randomly generated key. "
+                    "Sessions will be invalidated on app restart.")
 
+    # --- Initialize Extensions with App Context ---
+    mail.init_app(app) # Initialize Mail with the app
+    log.info("Flask-Mail initialized.")
 
     # --- CORS Configuration ---
     # Allow requests from the typical frontend development server origin
@@ -66,7 +75,12 @@ def create_app(config_class=Config):
 
 
     # --- Register Blueprints ---
-    # Note the url_prefix combines with prefixes defined within blueprints
+
+    from routes.auth_routes import auth_bp
+    from routes.geo_routes import geo_bp
+    from routes.routing_routes import routing_bp
+    from routes.tower_routes import tower_bp
+
     app.register_blueprint(auth_bp, url_prefix='/api') # Becomes /api/auth/...
     app.register_blueprint(geo_bp, url_prefix='/api') # Becomes /api/geo/...
     app.register_blueprint(routing_bp, url_prefix='/api') # Becomes /api/routing/...

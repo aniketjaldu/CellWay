@@ -48,9 +48,17 @@ export const useAuth = () => {
         // Errors handled by interceptor or below
         return { success: false, error: 'Login failed.' }; // Fallback error
     } catch (error) {
-        const errorMsg = error.response?.data?.error || 'Login failed. Please try again.';
-        // Toast handled by interceptor for common cases, but can add specific here
-        // toast.error(errorMsg);
+        const status = error.response?.status;
+        let errorMsg = error.response?.data?.error || 'Login failed. Please try again.';
+
+        // Specific handling for lockout (status 403 as set in backend route)
+        if (status === 403 && errorMsg.includes("Account locked")) {
+            // Keep the specific message from backend
+            toast.error(errorMsg, { id: 'login-lockout-err'});
+        } else {
+            // Use interceptor's default toast or show generic here if needed
+            toast.error(errorMsg, { id: 'login-err'});
+        }
         return { success: false, error: errorMsg };
     }
     }, []);
@@ -92,14 +100,33 @@ export const useAuth = () => {
     const forgotPassword = useCallback(async (email) => {
         try {
             const response = await api.forgotPasswordRequest(email);
-            if (response.data?.success) {
-                toast.success(response.data.message || 'Password reset email sent successfully!');
+             // Backend now *always* returns success: true, and a generic message
+            if (response.data?.success && response.data?.message) {
+                toast.success(response.data.message); // Show the generic message
                 return { success: true, message: response.data.message };
             }
+            // This part might not be reached if backend always returns success
             return { success: false, error: 'Failed to send reset email.' };
         } catch (error) {
             const errorMsg = error.response?.data?.error || 'Failed to send password reset email.';
             // toast.error(errorMsg);
+            return { success: false, error: errorMsg };
+        }
+    }, []);
+
+    // Reset Password function
+    const resetPassword = useCallback(async (token, newPassword) => {
+        try {
+            const response = await api.resetPassword(token, newPassword);
+            if (response.data?.success) {
+                toast.success(response.data.message || 'Password reset successfully!');
+                return { success: true, message: response.data.message };
+            }
+             // Should not happen if backend returns error via catch block
+            return { success: false, error: 'Password reset failed.' };
+        } catch (error) {
+            const errorMsg = error.response?.data?.error || 'Password reset failed. Please try again.';
+            toast.error(errorMsg); // Show specific error from backend
             return { success: false, error: errorMsg };
         }
     }, []);
@@ -113,6 +140,7 @@ export const useAuth = () => {
         register,
         logout,
         forgotPassword,
-        checkSession // Expose session check if needed externally
+        resetPassword,
+        checkSession
     };
 };

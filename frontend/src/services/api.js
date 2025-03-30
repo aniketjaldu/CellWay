@@ -25,7 +25,7 @@ api.interceptors.response.use(
       // Unauthorized - potentially redirect to login or show specific message
       // Avoid toast for 401 on /api/auth/user check, as it's expected
       if (!error.config.url.endsWith('/auth/user')) {
-         toast.error("Authentication required. Please log in.", { id: 'auth-error' });
+        // toast.error("Authentication required. Please log in.", { id: 'auth-error' });
       }
       // Optionally trigger logout state change here if using a state manager
     } else if (status === 403) {
@@ -51,6 +51,7 @@ export const registerUser = (email, password) => api.post('/auth/register', { em
 export const logoutUser = () => api.post('/auth/logout');
 export const checkUserSession = () => api.get('/auth/user'); // Renamed for clarity
 export const forgotPasswordRequest = (email) => api.post('/auth/forgot-password', { email });
+export const resetPassword = (token, newPassword) => api.post('/auth/reset-password', { token, newPassword });
 
 // --- Routing Endpoints ---
 /**
