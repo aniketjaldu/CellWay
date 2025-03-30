@@ -1,101 +1,148 @@
 import React, { useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
 import L from 'leaflet';
+
 import { getDirectionIcon } from '../../utils/formatting';
 
-// Note: Highlight styles (.highlighted-segment, .step-marker-icon etc.) should remain in App.css
-// or be moved to a shared MapMarkers.css file.
+/**
+ * RouteHighlight Component
+ * 
+ * This component is responsible for highlighting a specific route instruction (step)
+ * on the Leaflet map. It draws the segment's geometry and adds a marker at the
+ * maneuver point, then fits the map view to the highlighted elements.
+ * It automatically cleans up the previous highlight when the instruction changes or the component unmounts.
+ */
+const RouteHighlight = ({ map, instruction, type }) => {
+  const highlightLayerRef = useRef(null); // Ref to store the Leaflet layer group for the highlight
 
-const RouteHighlight = ({ map, instruction, type, clearHighlight }) => {
-  const highlightLayerRef = useRef(null);
 
+  // --- Highlight Effect ---
   useEffect(() => {
-    // Always clear previous highlight first
+
+    // --- Cleanup Previous Highlight ---
+    // Always remove the previous highlight layer before adding a new one
     if (highlightLayerRef.current) {
-        map.removeLayer(highlightLayerRef.current);
-        highlightLayerRef.current = null;
+      map.removeLayer(highlightLayerRef.current);
+      highlightLayerRef.current = null; // Clear the ref
     }
 
-    if (!map || !instruction) return; // No map or instruction to highlight
+    // --- Guard Clauses ---
+    // Exit if map instance or instruction data is missing
+    if (!map || !instruction) {
+      return; // Nothing to highlight
+    }
+
 
     try {
-      const group = L.layerGroup();
-      let boundsToFit = null;
+      const highlightGroup = L.layerGroup(); // Create a layer group to hold highlight elements
+      let boundsToFit = null; // Initialize bounds for fitting the map view
 
-      // Highlight the segment geometry
+
+      // --- Highlight Segment Geometry ---
       if (instruction.segmentCoordinates && instruction.segmentCoordinates.length > 1) {
+        // Convert [lng, lat] coordinates to Leaflet LatLng objects
         const latLngs = instruction.segmentCoordinates.map(coord => L.latLng(coord[1], coord[0]));
+        // Create a polyline for the segment
         const segmentLine = L.polyline(latLngs, {
           className: 'highlighted-segment', // Use CSS class for styling
-          // color: '#ff3300', weight: 7, opacity: 0.9, dashArray: '5, 5' // Fallback styles
         });
-        group.addLayer(segmentLine);
-        boundsToFit = segmentLine.getBounds();
+        highlightGroup.addLayer(segmentLine); // Add the line to the group
+        boundsToFit = segmentLine.getBounds(); // Get bounds of the segment line
       }
 
-      // Add a marker at the start coordinate of the maneuver
+
+      // --- Add Marker at Maneuver Point ---
       if (instruction.coordinates) {
         let lat, lng;
-        if (Array.isArray(instruction.coordinates)) [lng, lat] = instruction.coordinates;
-        else if (instruction.coordinates.lat !== undefined) { lat = instruction.coordinates.lat; lng = instruction.coordinates.lng; }
+        // Handle different potential coordinate formats
+        if (Array.isArray(instruction.coordinates)) {
+          [lng, lat] = instruction.coordinates;
+        } else if (instruction.coordinates.lat !== undefined) {
+          lat = instruction.coordinates.lat;
+          lng = instruction.coordinates.lng;
+        }
 
         if (lat !== undefined && lng !== undefined) {
-          const pointLatLng = L.latLng(lat, lng);
+          const pointLatLng = L.latLng(lat, lng); // Create LatLng for the marker
+
+          // Create a DivIcon for the step marker using HTML
           const iconHtml = `<div class="step-marker-icon">${getDirectionIcon(type) || '•'}</div>`;
-          const icon = L.divIcon({
-            html: iconHtml, className: 'step-marker-container',
-            iconSize: [24, 24], iconAnchor: [12, 12]
+          const stepIcon = L.divIcon({
+            html: iconHtml,
+            className: 'step-marker-container', // CSS class for the container
+            iconSize: [24, 24],                // Size of the icon
+            iconAnchor: [12, 12],              // Anchor point (center)
           });
+
+          // Create a hollow circle marker
           const hollowCircle = L.circleMarker(pointLatLng, {
-            className: 'hollow-step-marker', // Use CSS class
-            // radius: 10, color: '#ff3300', weight: 2, opacity: 0.9, fill: false // Fallback styles
+            className: 'hollow-step-marker', // Use CSS class for styling
           });
-          const iconMarker = L.marker(pointLatLng, { icon, interactive: false });
 
-          group.addLayer(hollowCircle);
-          group.addLayer(iconMarker);
+          // Create the icon marker itself
+          const iconMarker = L.marker(pointLatLng, {
+            icon: stepIcon,
+            interactive: false, // Marker should not be interactive
+          });
 
-          if (!boundsToFit) boundsToFit = L.latLngBounds(pointLatLng, pointLatLng);
-          else boundsToFit.extend(pointLatLng);
+          highlightGroup.addLayer(hollowCircle); // Add circle to the group
+          highlightGroup.addLayer(iconMarker);   // Add icon marker to the group
+
+          // Extend bounds to include the marker
+          if (!boundsToFit) {
+            boundsToFit = L.latLngBounds(pointLatLng, pointLatLng); // Create bounds if only marker exists
+          } else {
+            boundsToFit.extend(pointLatLng); // Extend existing bounds
+          }
         }
       }
 
-      if (group.getLayers().length > 0) {
-        group.addTo(map);
-        highlightLayerRef.current = group; // Store ref
 
+      // --- Add Highlight to Map and Fit Bounds ---
+      if (highlightGroup.getLayers().length > 0) { // Only add if there's something to show
+        highlightGroup.addTo(map); // Add the layer group to the map
+        highlightLayerRef.current = highlightGroup; // Store the reference to the added layer group
+
+        // Fit map view to the highlighted elements if bounds are valid
         if (boundsToFit?.isValid()) {
-          map.flyToBounds(boundsToFit, { padding: [80, 80], maxZoom: 17 });
+          map.flyToBounds(boundsToFit, { padding: [80, 80], maxZoom: 17 }); // Animate map view
         }
       }
 
     } catch (error) {
       console.error("Error highlighting route segment:", error);
-      // Ensure cleanup happens on error
-      if (highlightLayerRef.current) {
-          map.removeLayer(highlightLayerRef.current);
-          highlightLayerRef.current = null;
-      }
-    }
-
-    // Cleanup function for when instruction changes or component unmounts
-    return () => {
+      // --- Error Handling Cleanup ---
+      // Ensure cleanup happens even if an error occurs during highlight creation
       if (highlightLayerRef.current) {
         map.removeLayer(highlightLayerRef.current);
         highlightLayerRef.current = null;
       }
+    }
+
+
+    // --- Effect Cleanup Function ---
+    // This function runs when the component unmounts or dependencies change
+    return () => {
+      if (highlightLayerRef.current) {
+        map.removeLayer(highlightLayerRef.current); // Remove the highlight layer from the map
+        highlightLayerRef.current = null; // Clear the reference
+      }
     };
 
-  }, [map, instruction, type]); // Rerun when instruction changes
+  }, [map, instruction, type]); // Dependencies: Rerun effect if map, instruction, or type changes
 
-  return null; // Component renders layers directly on the map
+
+  // --- Component Rendering ---
+  // This component manages map layers directly and does not render any visible DOM elements itself
+  return null;
 };
 
+
+// --- Prop Type Definitions ---
 RouteHighlight.propTypes = {
-  map: PropTypes.object, // Leaflet map instance
-  instruction: PropTypes.object, // The specific direction step object
-  type: PropTypes.oneOfType([PropTypes.string, PropTypes.number]), // Maneuver type
-  clearHighlight: PropTypes.func, // Function from useMap to clear layer group 'highlight' (optional, handled internally now)
+  map: PropTypes.object, // Leaflet map instance (required for interaction)
+  instruction: PropTypes.object, // The specific direction step object to highlight
+  type: PropTypes.oneOfType([PropTypes.string, PropTypes.number]), // Maneuver type for icon lookup
 };
 
 export default RouteHighlight;

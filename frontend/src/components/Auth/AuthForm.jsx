@@ -1,15 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
+
 import './AuthForm.css';
 import { closeIconUrl } from '../../assets/icons/index.js';
 
+
+/**
+ * AuthForm Component
+ * 
+ * Generic authentication form component for login, registration, and forgot password modes.
+ */
 const AuthForm = ({
-  mode, // 'login', 'register', 'forgot_password'
+  mode, 
   onClose,
-  onLogin, // async (email, password) => { success, error }
-  onRegister, // async (email, password) => { success, error }
-  onForgotPassword, // async (email) => { success, error, message }
-  onChangeMode, // (newMode) => void
+  onLogin, 
+  onRegister, 
+  onForgotPassword, 
+  onChangeMode, 
 }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -18,9 +25,10 @@ const AuthForm = ({
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [message, setMessage] = useState(''); // For success messages like password reset
+  const [message, setMessage] = useState('');
 
-  // Clear state when mode changes or form opens/closes
+
+  // --- State Reset on Mode Change ---
   useEffect(() => {
     setEmail('');
     setPassword('');
@@ -30,68 +38,81 @@ const AuthForm = ({
     setError('');
     setMessage('');
     setIsLoading(false);
-  }, [mode, onClose]); // Rerun if mode changes or onClose changes (proxy for visibility)
+  }, [mode, onClose]); // Reset form state when mode or visibility changes
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
-    setMessage('');
-    setIsLoading(true);
 
-    let result;
+  // --- Form Submit Handler ---
+  const handleSubmit = async (event) => {
+    event.preventDefault(); // Prevent default form submission behavior
+    setError('');         // Clear any previous errors
+    setMessage('');        // Clear any previous messages
+    setIsLoading(true);    // Indicate loading state
+
+    let authResult;
     try {
       if (mode === 'login') {
-        result = await onLogin(email, password);
+        authResult = await onLogin(email, password);
       } else if (mode === 'register') {
         if (password !== confirmPassword) {
-          throw new Error('Passwords do not match');
+          throw new Error('Passwords do not match'); // Password mismatch error
         }
-        result = await onRegister(email, password);
+        authResult = await onRegister(email, password);
       } else if (mode === 'forgot_password') {
-        result = await onForgotPassword(email);
-        if (result.success) {
-          setMessage(result.message || 'Password reset email sent.');
-          // Optionally switch back to login after a delay
-          // setTimeout(() => onChangeMode('login'), 3000);
+        authResult = await onForgotPassword(email);
+        if (authResult.success) {
+          setMessage(authResult.message || 'Password reset email sent.');
+          // Optional: Auto-switch back to login after reset request
+          // setTimeout(() => onChangeMode('login'), 3000); 
         }
       }
 
-      if (result && !result.success && result.error) {
-        setError(result.error);
-      } else if (result && result.success && (mode === 'login' || mode === 'register')) {
-        onClose(); // Close form on successful login/register
+      if (authResult && !authResult.success && authResult.error) {
+        setError(authResult.error); // Set error message from auth result
+      } else if (authResult && authResult.success && (mode === 'login' || mode === 'register')) {
+        onClose(); // Close form on successful login or registration
       }
-    } catch (err) {
-      setError(err.message || 'An unexpected error occurred.');
+
+    } catch (submitError) {
+      setError(submitError.message || 'An unexpected error occurred.'); // Set generic error for exceptions
     } finally {
-      setIsLoading(false);
+      setIsLoading(false); // End loading state regardless of outcome
     }
   };
 
-  const getTitle = () => {
-    if (mode === 'login') return 'Login';
-    if (mode === 'register') return 'Register';
-    if (mode === 'forgot_password') return 'Forgot Password';
-    return '';
+
+  // --- Dynamic Form Title ---
+  const getFormTitle = () => {
+    switch (mode) {
+      case 'login':           return 'Login';
+      case 'register':        return 'Register';
+      case 'forgot_password': return 'Forgot Password';
+      default:                return '';
+    }
   };
 
+
+  // --- Render Form ---
   return (
-    <div className="auth-form-overlay" onClick={onClose}> {/* Close on overlay click */}
-      <div className="auth-form-container" onClick={(e) => e.stopPropagation()}> {/* Prevent closing on form click */}
+    <div className="auth-form-overlay" onClick={onClose}> {/* Close form on overlay click */}
+      <div className="auth-form-container" onClick={(event) => event.stopPropagation()}> {/* Prevent overlay close on form clicks */}
+
+        {/* --- Form Header --- */}
         <div className="auth-form-header">
-          <h2>{getTitle()}</h2>
+          <h2>{getFormTitle()}</h2>
           <button className="auth-close-button" onClick={onClose} title="Close" aria-label="Close">
-            {/* Use img tag with imported URL */}
             <img src={closeIconUrl} alt="Close" className="icon-img small" />
           </button>
         </div>
 
+        {/* --- Error and Message Display --- */}
         {error && <div className="auth-form-error">{error}</div>}
         {message && <div className="auth-form-message">{message}</div>}
 
-        {/* Don't show form fields if message indicates success (e.g., after password reset) */}
+        {/* --- Form Body (Conditional Rendering based on message) --- */}
         {!message && (
           <form onSubmit={handleSubmit} className="auth-form-body">
+
+            {/* --- Email Input Group --- */}
             <div className="form-group">
               <label htmlFor="auth-email">Email</label>
               <input
@@ -102,6 +123,7 @@ const AuthForm = ({
               />
             </div>
 
+            {/* --- Password Input Group (Conditional Rendering - not for forgot password mode) --- */}
             {mode !== 'forgot_password' && (
               <div className="form-group">
                 <label htmlFor="auth-password">Password</label>
@@ -119,7 +141,7 @@ const AuthForm = ({
                     className="password-visibility-toggle"
                     onClick={() => setShowPassword(prev => !prev)}
                     aria-label={showPassword ? "Hide password" : "Show password"}
-                    tabIndex="-1" // Prevent tabbing to it
+                    tabIndex="-1"
                   >
                     <span className={`eye-icon ${showPassword ? 'visible' : 'hidden'}`}></span>
                   </button>
@@ -127,36 +149,39 @@ const AuthForm = ({
               </div>
             )}
 
+            {/* --- Confirm Password Input Group (Conditional Rendering - register mode only) --- */}
             {mode === 'register' && (
               <div className="form-group">
                 <label htmlFor="auth-confirmPassword">Confirm Password</label>
-                 <div className="password-input-container">
-                    <input
-                      type={showConfirmPassword ? 'text' : 'password'}
-                      id="auth-confirmPassword" value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      required autoComplete="new-password"
-                      disabled={isLoading}
-                    />
-                    <button
-                      type="button"
-                      className="password-visibility-toggle"
-                      onClick={() => setShowConfirmPassword(prev => !prev)}
-                      aria-label={showConfirmPassword ? "Hide password" : "Show password"}
-                      tabIndex="-1"
-                    >
-                      <span className={`eye-icon ${showConfirmPassword ? 'visible' : 'hidden'}`}></span>
-                    </button>
-                 </div>
+                <div className="password-input-container">
+                  <input
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    id="auth-confirmPassword" value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required autoComplete="new-password"
+                    disabled={isLoading}
+                  />
+                  <button
+                    type="button"
+                    className="password-visibility-toggle"
+                    onClick={() => setShowConfirmPassword(prev => !prev)}
+                    aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                    tabIndex="-1"
+                  >
+                    <span className={`eye-icon ${showConfirmPassword ? 'visible' : 'hidden'}`}></span>
+                  </button>
+                </div>
               </div>
             )}
 
+            {/* --- Form Actions (Submit Button) --- */}
             <div className="form-actions">
               <button type="submit" className="submit-button" disabled={isLoading}>
-                {isLoading ? 'Processing...' : getTitle()}
+                {isLoading ? 'Processing...' : getFormTitle()}
               </button>
             </div>
 
+            {/* --- Auth Switch Links (Mode Switching Buttons) --- */}
             <div className="auth-switch-links">
               {mode === 'login' && (
                 <>
@@ -171,6 +196,7 @@ const AuthForm = ({
                 <button type="button" onClick={() => onChangeMode('login')}>Back to Login</button>
               )}
             </div>
+
           </form>
         )}
       </div>
@@ -178,13 +204,15 @@ const AuthForm = ({
   );
 };
 
+
 AuthForm.propTypes = {
-  mode: PropTypes.oneOf(['login', 'register', 'forgot_password']).isRequired,
-  onClose: PropTypes.func.isRequired,
-  onLogin: PropTypes.func.isRequired,
-  onRegister: PropTypes.func.isRequired,
-  onForgotPassword: PropTypes.func.isRequired,
-  onChangeMode: PropTypes.func.isRequired,
+  mode: PropTypes.oneOf(['login', 'register', 'forgot_password']).isRequired, // Current auth mode
+  onClose: PropTypes.func.isRequired,               // Handler to close the form
+  onLogin: PropTypes.func.isRequired,               // Handler for login submission
+  onRegister: PropTypes.func.isRequired,            // Handler for registration submission
+  onForgotPassword: PropTypes.func.isRequired,      // Handler for forgot password submission
+  onChangeMode: PropTypes.func.isRequired,         // Handler to switch auth mode
 };
+
 
 export default AuthForm;

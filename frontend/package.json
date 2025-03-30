@@ -10,16 +10,13 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@mapbox/polyline": "^1.2.1",
-    "@maptiler/leaflet-maptilersdk": "^4.0.2",
-    "@types/leaflet": "^1.9.17",
     "axios": "^1.8.4",
     "html2canvas": "^1.4.1",
-    "js-cookie": "^3.0.5",
     "leaflet": "^1.9.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "react-hot-toast": "^2.5.2"
+    "react-hot-toast": "^2.5.2",
+    "react-router-dom": "^7.4.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.21.0",
@@ -31,7 +28,6 @@
     "eslint-plugin-react-refresh": "^0.4.19",
     "globals": "^15.15.0",
     "prop-types": "^15.8.1",
-    "react-router-dom": "^7.4.1",
     "vite": "^6.2.0",
     "vite-plugin-svgr": "^4.3.0"
   }

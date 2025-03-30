@@ -1,108 +1,124 @@
 """
-Main Flask application setup file.
-Initializes the Flask app, configures CORS, registers blueprints,
-and sets up logging.
+Main Flask application setup and initialization.
+
+This script sets up the Flask application, configures CORS, initializes Flask-Mail,
+registers API blueprints for different functionalities (authentication, geocoding, routing, tower data),
+configures logging, and defines a basic health check endpoint.
 """
+import logging
+import os
+import secrets
+
 from flask import Flask, jsonify
 from flask_cors import CORS
 from flask_mail import Mail
-import logging
-import secrets
-import os
 
-# --- Configuration ---
-from config import Config # Absolute import
+from config import Config  # Absolute import for configuration
 
-# --- Blueprints ---
-# Use absolute imports from the backend packag
-
-# --- Logging Setup ---
-# Configure logging early
+# --- Logging Configuration ---
 logging.basicConfig(
-    level=logging.INFO, # Adjust level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S'
+    level=logging.INFO,  # Set default logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",  # Log message format
+    datefmt="%Y-%m-%d %H:%M:%S",  # Date format in logs
 )
-log = logging.getLogger(__name__) # Get logger for this module
+log = logging.getLogger(__name__)  # Logger for this module
 
-# --- Flask-Mail Setup ---
-mail = Mail()
+# --- Flask-Mail Initialization ---
+mail = Mail()  # Initialize Flask-Mail extension
 
-# --- App Initialization ---
-def create_app(config_class=Config):
-    """Creates and configures the Flask application."""
-    log.info("Creating Flask application...")
-    app = Flask(__name__, instance_relative_config=True)
 
-    # Load configuration
-    app.config.from_object(config_class)
-    log.info(f"App configured with {config_class.__name__}")
+# --- Flask Application Factory ---
+def create_app(config_class=Config) -> Flask:
+    """
+    Application factory function to create and configure the Flask application.
 
-    # --- Check for necessary Mail config ---
-    if not all([app.config.get('MAIL_SERVER'), app.config.get('MAIL_USERNAME'), app.config.get('MAIL_PASSWORD')]):
-         log.warning("MAIL_SERVER, MAIL_USERNAME, or MAIL_PASSWORD not fully configured. Email sending will likely fail.")
-    if not app.config.get('MAIL_DEFAULT_SENDER'):
-         log.warning("MAIL_DEFAULT_SENDER not configured.")
+    This function is used to create a new instance of the Flask application,
+    load configuration, initialize extensions, register blueprints,
+    configure CORS, and set up logging.
 
-    # Ensure instance folder exists for potential session files etc.
+    Args:
+        config_class (Config, optional): Configuration class to use for the Flask app.
+                                         Defaults to Config (from config.py).
+
+    Returns:
+        Flask: Configured Flask application instance.
+    """
+    log.info("Creating Flask application instance...")
+    app = Flask(__name__, instance_relative_config=True)  # Initialize Flask app
+
+    # --- Load Configuration ---
+    app.config.from_object(config_class)  # Load configuration from the specified class
+    log.info(f"Flask app configuration loaded from: {config_class.__name__}")
+
+    # --- Validate Mail Configuration ---
+    mail_config_vars = ["MAIL_SERVER", "MAIL_USERNAME", "MAIL_PASSWORD"]
+    if not all(app.config.get(key) for key in mail_config_vars):
+        log.warning(f"Flask-Mail is not fully configured. Missing configuration for: {', '.join(mail_config_vars)}. Email sending will likely fail.")
+    if not app.config.get("MAIL_DEFAULT_SENDER"):
+        log.warning("MAIL_DEFAULT_SENDER is not configured. Password reset emails will likely fail to send.")
+
+    # --- Ensure Instance Folder Exists ---
     try:
-        os.makedirs(app.instance_path, exist_ok=True)
-    except OSError:
-        log.error(f"Could not create instance folder at {app.instance_path}")
+        os.makedirs(app.instance_path, exist_ok=True)  # Create instance folder if it doesn't exist
+    except OSError as e:
+        log.error(f"Could not create instance folder at '{app.instance_path}'. Error: {e}")
 
-    # Set secret key for session management
-    # Use SECRET_KEY from config, fallback to generating one (less ideal for prod)
-    app.secret_key = app.config.get('SECRET_KEY') or secrets.token_hex(16)
-    if not app.config.get('SECRET_KEY'):
-        log.warning("SECRET_KEY not set in config, using a randomly generated key. "
-                    "Sessions will be invalidated on app restart.")
+    # --- Configure Secret Key for Sessions ---
+    app.secret_key = app.config.get("SECRET_KEY") or secrets.token_hex(16)  # Use SECRET_KEY from config or generate a fallback key
+    if not app.config.get("SECRET_KEY"):
+        log.warning(
+            "SECRET_KEY is not set in configuration. Using a randomly generated secret key. "
+            "Sessions will be invalidated on application restart. This is not recommended for production."
+        )
 
-    # --- Initialize Extensions with App Context ---
-    mail.init_app(app) # Initialize Mail with the app
-    log.info("Flask-Mail initialized.")
+    # --- Initialize Flask Extensions ---
+    mail.init_app(app)  # Initialize Flask-Mail with the Flask application
+    log.info("Flask-Mail extension initialized.")
 
-    # --- CORS Configuration ---
-    # Allow requests from the typical frontend development server origin
-    # In production, restrict this to the actual frontend domain
-    # TODO: Make origins configurable via environment variable for production
-    CORS(app, resources={
-            r"/api/*": {
-                "origins": ["http://localhost:5173", "http://127.0.0.1:5173"], # Add other origins if needed
-                "supports_credentials": True
-            }
-        })
-    log.info("CORS configured for development origins.")
+    # --- Configure CORS (Cross-Origin Resource Sharing) ---
+    # Allow CORS for development frontend origins; restrict origins in production for security.
+    frontend_dev_origins = ["http://localhost:5173", "http://127.0.0.1:5173"]  # Development frontend origins
+    cors_origins = frontend_dev_origins  # Use development origins for now (TODO: make configurable for production)
 
+    CORS(
+        app,
+        resources={r"/api/*": {"origins": cors_origins, "supports_credentials": True}},  # Configure CORS for /api/* routes
+    )
+    log.info(f"CORS configured to allow requests from origins: {cors_origins}")
 
-    # --- Register Blueprints ---
+    # --- Register API Blueprints ---
+    from routes.auth_routes import auth_bp  # Import authentication blueprint
+    from routes.geo_routes import geo_bp  # Import geocoding blueprint
+    from routes.routing_routes import routing_bp  # Import routing blueprint
+    from routes.tower_routes import tower_bp  # Import tower data blueprint
 
-    from routes.auth_routes import auth_bp
-    from routes.geo_routes import geo_bp
-    from routes.routing_routes import routing_bp
-    from routes.tower_routes import tower_bp
+    app.register_blueprint(auth_bp, url_prefix="/api")  # Register authentication blueprint under /api prefix
+    app.register_blueprint(geo_bp, url_prefix="/api")  # Register geocoding blueprint under /api prefix
+    app.register_blueprint(routing_bp, url_prefix="/api")  # Register routing blueprint under /api prefix
+    app.register_blueprint(tower_bp, url_prefix="/api")  # Register tower data blueprint under /api prefix
+    log.info("Registered API blueprints for authentication, geocoding, routing, and tower data.")
 
-    app.register_blueprint(auth_bp, url_prefix='/api') # Becomes /api/auth/...
-    app.register_blueprint(geo_bp, url_prefix='/api') # Becomes /api/geo/...
-    app.register_blueprint(routing_bp, url_prefix='/api') # Becomes /api/routing/...
-    app.register_blueprint(tower_bp, url_prefix='/api') # Becomes /api/towers/...
-    log.info("Registered API blueprints.")
-
-    @app.route('/api/ping')
-    def ping():
-        log.info("Ping route accessed!")
+    # --- Define Test Endpoint ---
+    @app.route("/api/ping")  # Define a simple ping endpoint for API testing
+    def ping_api():
+        """API health check endpoint (returns 'pong')."""
+        log.info("API ping endpoint '/api/ping' was accessed.")
         return jsonify({"message": "pong"})
 
-    # --- Optional: Add a simple root route for health check ---
-    @app.route('/')
+    # --- Define Root Endpoint (Health Check) ---
+    @app.route("/")  # Define a basic root endpoint for health check
     def index():
+        """Root endpoint for basic health check (returns 'Backend is running.')."""
         return "Backend is running."
 
-    log.info("Flask application created successfully.")
-    return app
+    log.info("Flask application created and configured successfully.")
+    return app  # Return the created Flask application
 
-# --- Main Execution ---
-if __name__ == '__main__':
-    app = create_app()
-    # Use waitress or gunicorn for production instead of Flask development server
+
+# --- Application Execution Entry Point ---
+if __name__ == "__main__":
+    app = create_app()  # Create Flask application instance
+    # --- Start Flask Development Server ---
     log.info("Starting Flask development server...")
-    app.run(debug=True, host='0.0.0.0', port=5001) # Listen on all interfaces for container access
+    app.run(debug=True, host="0.0.0.0", port=5001)  # Run Flask app in debug mode on all interfaces (for container access)
+    # --- NOTE: Use production-ready WSGI server (e.g., gunicorn, waitress) for production deployments. ---

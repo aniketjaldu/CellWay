@@ -1,112 +1,167 @@
-# backend/routes/routing_routes.py
 """
-Handles route calculation and management endpoints:
-- Calculating routes (fastest, cell coverage, balanced)
-- Saving routes for logged-in users
-- Retrieving saved routes for logged-in users
+API endpoints for route calculation and saved route management:
+- Route Calculation: Fastest, Cell Coverage, Balanced routes.
+- Saved Routes: Saving and retrieving routes for authenticated users.
 """
-from flask import Blueprint, request, jsonify, session
 import logging
-from services import routing_service # Go up to backend/, then down to services/
-from models import route as route_model # Import the specific route model module
-from .auth_routes import login_required # Import from sibling module within routes/
 
+from flask import Blueprint, jsonify, request, session
+
+from .auth_routes import login_required  # Import from sibling module within routes/
+from models import route as route_model  # Import the specific route model module
+from services import routing_service  # Go up to backend/, then down to services/
+
+# Initialize blueprint for routing routes
+routing_bp = Blueprint("routing", __name__)
+
+# Get logger for this module
 log = logging.getLogger(__name__)
 
-routing_bp = Blueprint('routing', __name__)
 
-@routing_bp.route('/routing/calculate', methods=['GET']) # Renamed from /route for clarity
-def get_route():
-    """Endpoint for calculating routes with different optimizations."""
-    # Extract and validate coordinates
-    start_lat_str = request.args.get('start_lat')
-    start_lng_str = request.args.get('start_lng')
-    end_lat_str = request.args.get('end_lat')
-    end_lng_str = request.args.get('end_lng')
+@routing_bp.route("/routing/calculate", methods=["GET"])  # Renamed from /route for clarity
+def calculate_route():
+    """
+    Endpoint for calculating routes based on different optimization types.
 
+    Accepts query parameters for start and end coordinates (latitude and longitude),
+    and an optional 'route_type' parameter to specify the optimization (fastest, cell_coverage, balanced).
+
+    Returns:
+        jsonify: JSON response containing route data or an error message.
+                 Returns 400 status for missing or invalid coordinate parameters, or invalid route_type.
+                 Returns appropriate error status codes based on routing service responses (e.g., 400, 503).
+                 Returns 500 status for unexpected server errors.
+    """
+    # Extract coordinate parameters from the request
+    start_lat_str = request.args.get("start_lat")
+    start_lng_str = request.args.get("start_lng")
+    end_lat_str = request.args.get("end_lat")
+    end_lng_str = request.args.get("end_lng")
+
+    # Validate that all coordinate parameters are provided
     if not all([start_lat_str, start_lng_str, end_lat_str, end_lng_str]):
-        log.warning("Route request failed: Missing coordinate parameters")
-        return jsonify({'error': 'Missing required coordinates (start_lat, start_lng, end_lat, end_lng)'}), 400
+        log.warning("Route calculation request failed: Missing coordinate parameters.")
+        return jsonify(
+            {
+                "error": "Missing required coordinates (start_lat, start_lng, end_lat, end_lng)"
+            }
+        ), 400
 
+    # Convert coordinate strings to floats and handle potential ValueError
     try:
         start_lat = float(start_lat_str)
         start_lng = float(start_lng_str)
         end_lat = float(end_lat_str)
         end_lng = float(end_lng_str)
     except ValueError:
-        log.warning("Route request failed: Invalid coordinate format. Received: start=(%s, %s), end=(%s, %s)",
-                    start_lat_str, start_lng_str, end_lat_str, end_lng_str)
-        return jsonify({'error': 'Coordinates must be valid numbers'}), 400
+        log.warning(
+            "Route calculation request failed: Invalid coordinate format. Received: start=(%s, %s), end=(%s, %s)",
+            start_lat_str,
+            start_lng_str,
+            end_lat_str,
+            end_lng_str,
+        )
+        return jsonify({"error": "Coordinates must be valid numbers"}), 400
 
-    # Get optimization type (defaults to balanced)
-    route_type = request.args.get('route_type', 'balanced').lower()
-    valid_route_types = ['fastest', 'cell_coverage', 'balanced']
+    # Get route type from query parameters, default to 'balanced' if not provided or invalid
+    route_type = request.args.get("route_type", "balanced").lower()
+    valid_route_types = ["fastest", "cell_coverage", "balanced"]
     if route_type not in valid_route_types:
-        log.warning("Route request with invalid route_type '%s', defaulting to 'balanced'", route_type)
-        route_type = 'balanced'
+        log.warning(
+            f"Route calculation request with invalid route_type '{route_type}', defaulting to 'balanced'."
+        )
+        route_type = "balanced"
 
-    log.info(f"Calculating route from ({start_lat}, {start_lng}) to ({end_lat}, {end_lng}), type: {route_type}")
+    log.info(
+        f"Calculating '{route_type}' route from ({start_lat}, {start_lng}) to ({end_lat}, {end_lng})."
+    )
 
     try:
-        # Call the appropriate service function based on route_type
-        if route_type == 'cell_coverage':
+        # Call the appropriate routing service function based on route_type
+        if route_type == "cell_coverage":
             result = routing_service.get_route_cell_coverage(start_lat, start_lng, end_lat, end_lng)
-        elif route_type == 'fastest':
+        elif route_type == "fastest":
             result = routing_service.get_route_fastest(start_lat, start_lng, end_lat, end_lng)
         else:  # balanced (default)
             result = routing_service.get_route_balanced(start_lat, start_lng, end_lat, end_lng)
 
-        # Check for errors from the service (e.g., NoRoute, API key error)
-        if 'code' in result and result['code'] != 'Ok':
-            error_message = result.get('message', 'Route calculation failed')
-            log.error("Route calculation service failed for type %s: %s", route_type, error_message)
-            # Determine appropriate status code
-            status_code = 400 # Bad request (e.g., NoRoute, points too far)
-            if result['code'] == 'Error': # Internal server / config error
-                status_code = 503 # Service Unavailable or 500 Internal Server Error
-            elif result['code'] == 'PointNotFound':
-                 status_code = 400 # Bad request (points not on road)
-            elif result['code'] == 'NoRoute':
-                 status_code = 400 # Bad request (no path between points)
-            return jsonify({'error': error_message}), status_code
+        # Handle potential errors from the routing service
+        if "code" in result and result["code"] != "Ok":
+            error_message = result.get("message", "Route calculation failed")
+            log.error(f"Routing service failed for '{route_type}' route: {error_message}")
+            status_code = 400  # Default to 400 Bad Request
+            error_code = result["code"]
+            if error_code == "Error":  # Service internal error
+                status_code = 503  # Service Unavailable
+            elif error_code in ["PointNotFound", "NoRoute"]:  # Input related errors
+                status_code = 400  # Bad Request
+            return jsonify({"error": error_message}), status_code
 
-        # Success
-        return jsonify(result) # 200 OK is default
+        return jsonify(result)  # Return successful route calculation result
 
     except Exception as e:
-        # Catch unexpected errors during processing
-        log.exception(f"Unexpected error in /routing/calculate endpoint: {e}") # Log full traceback
-        return jsonify({'error': f'An unexpected error occurred during route calculation.'}), 500
+        log.exception("Unexpected error during route calculation: %s", e)
+        return jsonify(
+            {"error": "An unexpected error occurred during route calculation."}
+        ), 500  # 500 for internal server errors
 
-# --- Saved Routes Endpoints ---
-@routing_bp.route('/routing/save', methods=['POST']) # Renamed from /save-route
+
+@routing_bp.route("/routing/save", methods=["POST"])  # Renamed from /save-route
 @login_required
 def save_route():
-    """Endpoint for saving routes for the logged-in user."""
+    """
+    Endpoint for saving a route for the logged-in user. Requires authentication.
+
+    Expects JSON data in the request body containing route details:
+    - 'origin' (dict): Origin location details {place_name, lat, lng}.
+    - 'destination' (dict): Destination location details {place_name, lat, lng}.
+    - 'route_data' (dict): Detailed route data object(s).
+    - 'route_type' (str): Route optimization type ('balanced', 'fastest', etc.).
+    - 'route_image' (str, optional): Base64 encoded image of the route map.
+    - 'route_geometry' (dict, optional): Pre-calculated geometry for display.
+    - 'has_multiple_routes' (bool, optional): Flag for multiple route types.
+
+    Returns:
+        jsonify: JSON response indicating success or error.
+                 Returns 201 status on successful route saving with the new route ID.
+                 Returns 400 status for missing or invalid request data.
+                 Returns 500 status for unexpected server errors or model errors.
+    """
+    user_id = session["user_id"]  # Get user ID from session (login_required ensures it exists)
     data = request.json
-    user_id = session['user_id'] # Get from session via login_required
 
-    origin = data.get('origin') # Expecting { place_name, lat, lng }
-    destination = data.get('destination') # Expecting { place_name, lat, lng }
-    route_data = data.get('route_data') # Expecting the raw route response object(s)
-    route_type = data.get('route_type', 'balanced') # Active route type being saved
-    route_image = data.get('route_image') # Optional base64 image
-    route_geometry = data.get('route_geometry') # Optional pre-calculated geometry for display
-    has_multiple_routes = data.get('has_multiple_routes', False) # Flag if multiple types were computed
+    # Extract route details from JSON data
+    origin = data.get("origin")
+    destination = data.get("destination")
+    route_data = data.get("route_data")
+    route_type = data.get("route_type", "balanced")  # Default to 'balanced' if not provided
+    route_image = data.get("route_image")
+    route_geometry = data.get("route_geometry")
+    has_multiple_routes = data.get("has_multiple_routes", False)  # Default to False if not provided
 
-    # Basic validation
+    # Validate that required data is present
     if not all([origin, destination, route_data, route_type]):
-        log.warning("Save route request failed for user %s: Missing required data", user_id)
-        return jsonify({'error': 'Missing required data (origin, destination, route_data, route_type)'}), 400
+        log.warning(f"Save route request failed for user '{user_id}': Missing required data.")
+        return jsonify(
+            {
+                "error": "Missing required data (origin, destination, route_data, route_type)"
+            }
+        ), 400
     if not isinstance(origin, dict) or not isinstance(destination, dict):
-         log.warning("Save route request failed for user %s: Invalid origin/destination format", user_id)
-         return jsonify({'error': 'Invalid origin/destination format'}), 400
-    if 'lat' not in origin or 'lng' not in origin or 'lat' not in destination or 'lng' not in destination:
-         log.warning("Save route request failed for user %s: Missing lat/lng in origin/destination", user_id)
-         return jsonify({'error': 'Missing lat/lng in origin/destination'}), 400
+        log.warning(
+            f"Save route request failed for user '{user_id}': Invalid origin/destination format."
+        )
+        return jsonify({"error": "Invalid origin/destination format"}), 400
+    if not all(key in origin for key in ["lat", "lng"]) or not all(
+        key in destination for key in ["lat", "lng"]
+    ):
+        log.warning(
+            f"Save route request failed for user '{user_id}': Missing 'lat' or 'lng' in origin/destination."
+        )
+        return jsonify({"error": "Missing 'lat' or 'lng' in origin/destination"}), 400
 
     try:
-        # Call the model function
+        # Call the route model to save the route to the database
         route_id_str, error = route_model.save_route(
             user_id=user_id,
             origin=origin,
@@ -115,37 +170,46 @@ def save_route():
             route_type=route_type,
             route_image=route_image,
             route_geometry=route_geometry,
-            has_multiple_routes=has_multiple_routes
+            has_multiple_routes=has_multiple_routes,
         )
         if error:
-            log.error("Error saving route for user %s: %s", user_id, error)
-            # Determine status code based on error type if possible, default 500
-            return jsonify({'error': error}), 500
+            log.error(f"Error saving route for user '{user_id}': {error}")
+            return jsonify({"error": error}), 500  # 500 for model-related errors
 
-        log.info("Route saved successfully for user %s, route_id: %s", user_id, route_id_str)
-        return jsonify({'success': True, 'route_id': route_id_str}), 201 # Use 201 Created
+        log.info(f"Route saved successfully for user '{user_id}', route_id: '{route_id_str}'.")
+        return jsonify({"success": True, "route_id": route_id_str}), 201  # 201 Created
 
-    except Exception as e: # Catch unexpected errors during model call
-        log.exception("Unexpected error saving route for user %s: %s", user_id, e)
-        return jsonify({'error': 'Failed to save route due to unexpected error'}), 500
+    except Exception as e:
+        log.exception(f"Unexpected error saving route for user '{user_id}': {e}")
+        return jsonify(
+            {"error": "Failed to save route due to unexpected error"}
+        ), 500  # 500 for general server errors
 
 
-@routing_bp.route('/routing/saved', methods=['GET']) # Renamed from /saved-routes
+@routing_bp.route("/routing/saved", methods=["GET"])  # Renamed from /saved-routes
 @login_required
 def get_saved_routes():
-    """Endpoint for retrieving saved routes for the logged-in user."""
-    user_id = session['user_id'] # Get from session via login_required
+    """
+    Endpoint for retrieving saved routes for the logged-in user. Requires authentication.
+
+    Returns:
+        jsonify: JSON response containing a list of saved route objects or an error message.
+                 Returns 200 status on successful retrieval of saved routes.
+                 Returns 500 status for unexpected server errors or model errors.
+    """
+    user_id = session["user_id"]  # Get user ID from session (login_required ensures it exists)
     try:
-        # Call the model function
+        # Call the route model to retrieve saved routes from the database
         routes, error = route_model.get_saved_routes(user_id)
         if error:
-             log.error("Error retrieving saved routes for user %s: %s", user_id, error)
-             # Determine status code based on error type if possible, default 500
-             return jsonify({'error': error}), 500
+            log.error(f"Error retrieving saved routes for user '{user_id}': {error}")
+            return jsonify({"error": error}), 500  # 500 for model-related errors
 
-        log.info("Retrieved %d saved routes for user %s", len(routes), user_id)
-        # Model function already converts IDs to strings
-        return jsonify(routes)
-    except Exception as e: # Catch unexpected errors
-        log.exception("Unexpected error retrieving saved routes for user %s: %s", user_id, e)
-        return jsonify({'error': 'Failed to retrieve saved routes due to unexpected error'}), 500
+        log.info(f"Retrieved {len(routes)} saved routes for user '{user_id}'.")
+        return jsonify(routes)  # Return list of saved routes
+
+    except Exception as e:
+        log.exception(f"Unexpected error retrieving saved routes for user '{user_id}': {e}")
+        return jsonify(
+            {"error": "Failed to retrieve saved routes due to unexpected error"}
+        ), 500  # 500 for general server errors

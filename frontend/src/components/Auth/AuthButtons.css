@@ -1,4 +1,8 @@
-.auth-buttons-container {
+/* ==================================================
+   AUTH BUTTONS - Container and General Button Styles
+   ================================================== */
+
+   .auth-buttons-container {
     position: absolute;
     bottom: 20px;
     left: 20px;
@@ -7,7 +11,7 @@
     flex-direction: column;
     gap: 10px;
   }
-
+  
   .auth-button {
     padding: 8px 15px;
     border-radius: 12px;
@@ -18,30 +22,39 @@
     font-size: 14px;
     transition: all 0.3s ease;
     color: #333;
-    display: flex; /* Added for icon alignment if needed */
-    align-items: center; /* Added for icon alignment */
-    justify-content: center; /* Added for icon alignment */
+    display: flex; /* For icon alignment */
+    align-items: center; /* For icon alignment */
+    justify-content: center; /* For icon alignment */
   }
-
+  
   .auth-button:hover {
     transform: scale(1.05);
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
   }
-
-  .my-routes-button { /* Was .user-button */
+  
+  
+  /* ==================================================
+     AUTH BUTTONS - Specific Button Variations
+     ================================================== */
+  
+  .my-routes-button { /* My Routes Button (formerly user-button) */
     background-color: #2A93EE;
     color: white;
   }
-
+  
   .logout-button {
     background-color: #f5f5f5;
   }
-
-  /* User icon and auth menu styles */
+  
+  
+  /* ==================================================
+     USER ICON - Button and Image Styles
+     ================================================== */
+  
   .user-icon-container {
     position: relative;
   }
-
+  
   .user-icon-button {
     width: 44px;
     height: 44px;
@@ -49,18 +62,20 @@
     padding: 0;
   }
   
-  /* Style for the image inside the user icon button */
-  .user-icon-button .icon-img {
-    width: 22px; /* Control size */
+  .user-icon-button .icon-img { /* Image inside user icon button */
+    width: 22px;
     height: 22px;
-    display: block; /* Remove extra space below image */
-    /* Optional: Use filter to change color if SVGs are single-color */
-    /* filter: invert(20%); */
+    display: block;
   }
-
+  
+  
+  /* ==================================================
+     AUTH MENU POPUP - Container, Arrow, and Options
+     ================================================== */
+  
   .auth-menu-popup {
     position: absolute;
-    bottom: 55px; /* Position above the button */
+    bottom: 55px;
     left: 0;
     background: white;
     border-radius: 12px;
@@ -73,19 +88,19 @@
     z-index: 1001;
     animation: popup-fade-in 0.2s ease-out;
   }
-
+  
   .auth-menu-arrow {
     position: absolute;
-    bottom: -8px; /* Position below the popup */
-    left: 18px; /* Align with button */
+    bottom: -8px;
+    left: 18px;
     width: 16px;
     height: 16px;
     background: white;
     transform: rotate(45deg);
-    box-shadow: 4px 4px 5px rgba(0, 0, 0, 0.1); /* Adjust shadow */
-    z-index: -1; /* Behind popup content */
+    box-shadow: 4px 4px 5px rgba(0, 0, 0, 0.1);
+    z-index: -1;
   }
-
+  
   .auth-menu-option {
     padding: 8px 12px;
     border-radius: 8px;
@@ -100,35 +115,41 @@
     align-items: center;
     gap: 8px;
   }
-
-  .auth-menu-icon { /* Target the SVG component */
-    width: 16px;
-    height: 16px;
-    fill: #333; /* Use fill for SVGs */
-  }
-
-  /* Wrapper for menu icons if needed for alignment/spacing */
-.auth-menu-icon-wrapper {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 16px; /* Match desired icon size */
-    height: 16px;
-  }
   
-  /* Style for the small images inside the menu options */
-  .auth-menu-option .icon-img.small {
-    width: 16px; /* Control size */
-    height: 16px;
-    display: block;
-    /* Optional: Use filter to change color */
-    /* filter: invert(20%); */
-  }
-
   .auth-menu-option:hover {
     background-color: #f0f0f0;
   }
-
+  
+  
+  /* ==================================================
+     AUTH MENU POPUP - Icons and Icon Wrapper
+     ================================================== */
+  
+  .auth-menu-icon { /* SVG icons in menu */
+    width: 16px;
+    height: 16px;
+    fill: #333;
+  }
+  
+  .auth-menu-icon-wrapper { /* Wrapper for menu icons */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+  }
+  
+  .auth-menu-option .icon-img.small { /* Small images in menu options */
+    width: 16px;
+    height: 16px;
+    display: block;
+  }
+  
+  
+  /* ==================================================
+     ANIMATIONS - Keyframe Animations
+     ================================================== */
+  
   @keyframes popup-fade-in {
     from {
       opacity: 0;

@@ -1,4 +1,8 @@
-.route-type-modal-overlay { /* Renamed from .route-type-selection-overlay */
+/* ==================================================
+   ROUTE TYPE MODAL - Overlay and Animation
+   ================================================== */
+
+   .route-type-modal-overlay {
     position: fixed;
     top: 0;
     left: 0;
@@ -9,15 +13,20 @@
     justify-content: center;
     align-items: center;
     z-index: 1500; /* Highest z-index */
-    animation: fadeInModal 0.3s ease; /* Renamed animation */
+    animation: fadeInModal 0.3s ease;
   }
   
-  @keyframes fadeInModal { /* Renamed animation */
+  @keyframes fadeInModal { /* Fade-in animation for modal overlay */
     from { opacity: 0; }
     to { opacity: 1; }
   }
   
-  .route-type-modal-content { /* Renamed from .route-type-selection-content */
+  
+  /* ==================================================
+     ROUTE TYPE MODAL - Content Box
+     ================================================== */
+  
+  .route-type-modal-content {
     width: 90%;
     max-width: 500px;
     background: white;
@@ -26,6 +35,11 @@
     box-shadow: 0 5px 30px rgba(0, 0, 0, 0.3);
   }
   
+  
+  /* ==================================================
+     ROUTE TYPE MODAL - Header and Close Button
+     ================================================== */
+  
   .route-type-modal-header {
     display: flex;
     justify-content: space-between;
@@ -33,13 +47,13 @@
     margin-bottom: 10px;
   }
   
-  .route-type-modal-header h3 {
-    margin: 0; /* Remove default margin */
+  .route-type-modal-header h3 { /* Modal title */
+    margin: 0;
     font-size: 20px;
     color: #333;
   }
   
-  .route-type-modal-close { /* Style close button */
+  .route-type-modal-close { /* Modal close button */
     background: none;
     border: none;
     cursor: pointer;
@@ -52,29 +66,33 @@
     border-radius: 50%;
     transition: background-color 0.2s;
   }
-  .route-type-modal-close .icon-img.small {
-    width: 16px; /* Control size */
+  
+  .route-type-modal-close .icon-img.small { /* Icon in close button */
+    width: 16px;
     height: 16px;
     display: block;
-    /* Optional: filter for color */
-    /* filter: invert(40%); */
   }
-  .route-type-modal-close:hover {
+  
+  .route-type-modal-close:hover { /* Close button hover */
     background-color: rgba(0,0,0,0.08);
   }
-  .route-type-modal-close:hover .icon-img.small {
-    /* Optional: change filter on hover */
+  
+  .route-type-modal-close:hover .icon-img.small { /* Close button icon hover */
     filter: invert(10%);
   }
+  
+  
+  /* ==================================================
+     ROUTE TYPE MODAL - Description and Loading
+     ================================================== */
   
   .route-type-modal-description {
     margin-bottom: 20px;
     color: #666;
-    font-size: 14px; /* Slightly smaller description */
+    font-size: 14px;
   }
   
-  /* Loading Indicator */
-  .route-type-loading-indicator {
+  .route-type-loading-indicator { /* Loading state indicator */
     text-align: center;
     padding: 15px;
     font-style: italic;
@@ -84,12 +102,21 @@
     margin-bottom: 20px;
   }
   
-  /* Route Options */
+  
+  /* ==================================================
+     ROUTE SELECTION OPTIONS - Container and Layout
+     ================================================== */
+  
   .route-selection-options {
     display: flex;
     flex-direction: column;
     gap: 15px;
   }
+  
+  
+  /* ==================================================
+     ROUTE SELECTION OPTION - Individual Option Styling
+     ================================================== */
   
   .route-selection-option {
     display: flex;
@@ -103,64 +130,67 @@
     text-align: left;
   }
   
-  .route-selection-option:hover:not(:disabled) {
+  .route-selection-option:hover:not(:disabled) { /* Option hover state */
     background-color: #e8f4ff;
     transform: translateY(-2px);
     border-color: #2A93EE;
     box-shadow: 0 4px 12px rgba(42, 147, 238, 0.2);
   }
   
-  .route-selection-option.active { /* Style for currently selected type */
-    background-color: #e0f0ff; /* Slightly different background */
-    border-color: #1a81d6; /* Darker border */
+  .route-selection-option.active { /* Active/selected option state */
+    background-color: #e0f0ff;
+    border-color: #1a81d6;
     box-shadow: 0 2px 8px rgba(42, 147, 238, 0.15);
   }
   
-  .route-selection-option.available:not(.active):not(:disabled) { /* Subtle hint for available */
-    /* Optional: Add a subtle border or shadow */
-    /* border-color: #a5d6a7; */
+  .route-selection-option.available:not(.active):not(:disabled) { /* Available hint (optional) */
+    /* Optional: Add subtle styles for available options */
   }
   
-  .route-selection-icon {
+  .route-selection-icon { /* Icon within the option */
     font-size: 24px;
     margin-right: 15px;
     min-width: 30px;
     text-align: center;
-    color: #555; /* Default icon color */
-  }
-  .route-selection-option.active .route-selection-icon {
-    color: #1a81d6; /* Color for active icon */
+    color: #555;
   }
   
+  .route-selection-option.active .route-selection-icon { /* Active option icon color */
+    color: #1a81d6;
+  }
   
-  .route-selection-label {
+  .route-selection-label { /* Main label text */
     font-weight: 600;
     font-size: 16px;
     color: #333;
-    flex: 1; /* Take available space */
+    flex: 1;
   }
   
-  .route-selection-desc {
+  .route-selection-desc { /* Description text (e.g., duration) */
     font-size: 14px;
     color: #777;
-    margin-left: auto; /* Push to the right */
-    white-space: nowrap; /* Prevent wrapping */
+    margin-left: auto;
+    white-space: nowrap;
   }
   
-  .route-selection-option .calculating {
+  .route-selection-option .calculating { /* Text shown while calculating */
     color: #888;
     font-style: italic;
     font-size: 12px;
   }
   
-  /* Disabled State */
+  
+  /* ==================================================
+     ROUTE SELECTION OPTION - Disabled/Unavailable State
+     ================================================== */
+  
   .route-selection-option:disabled,
-  .route-selection-option.unavailable { /* Style unavailable state */
+  .route-selection-option.unavailable { /* Disabled or unavailable option */
     opacity: 0.6;
     cursor: not-allowed;
     background-color: #f5f5f5;
     border-color: #ddd;
-    pointer-events: none; /* Prevent clicks */
+    pointer-events: none;
   }
   
   .route-selection-option:disabled:hover { /* Remove hover effect when disabled */
@@ -174,59 +204,65 @@
   .route-selection-option:disabled .route-selection-desc,
   .route-selection-option.unavailable .route-selection-icon,
   .route-selection-option.unavailable .route-selection-label,
-  .route-selection-option.unavailable .route-selection-desc {
-    color: #999; /* Grey out text */
+  .route-selection-option.unavailable .route-selection-desc { /* Grey out text when disabled */
+    color: #999;
   }
   
   .route-selection-option:disabled .calculating,
-  .route-selection-option.unavailable .calculating {
-    color: #aaa; /* Lighter grey for calculating text when disabled */
+  .route-selection-option.unavailable .calculating { /* Lighter grey for calculating text when disabled */
+    color: #aaa;
   }
   
   
-  /* "Don't ask again" Toggle */
+  /* ==================================================
+     DON'T ASK AGAIN - Checkbox Toggle
+     ================================================== */
+  
   .route-selection-dont-ask {
-    margin: 20px 0 10px; /* Adjust margin */
+    margin: 20px 0 10px;
     text-align: center;
   }
   
-  .dont-ask-label {
-    display: inline-flex; /* Use inline-flex for better alignment */
+  .dont-ask-label { /* Label wrapper for checkbox */
+    display: inline-flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     user-select: none;
-    padding: 5px; /* Add padding for easier clicking */
+    padding: 5px;
   }
   
-  .dont-ask-label input[type="checkbox"] {
+  .dont-ask-label input[type="checkbox"] { /* Checkbox style */
     margin-right: 8px;
     width: 16px;
     height: 16px;
     cursor: pointer;
-    accent-color: #2A93EE; /* Style checkbox color */
+    accent-color: #2A93EE;
   }
   
-  .dont-ask-text {
+  .dont-ask-text { /* Text next to checkbox */
     font-size: 14px;
     color: #666;
     transition: color 0.2s;
   }
   
-  /* When checkbox is checked, highlight the text */
-  .dont-ask-label input[type="checkbox"]:checked + .dont-ask-text {
-    color: #2A93EE; /* Use theme color */
+  .dont-ask-label input[type="checkbox"]:checked + .dont-ask-text { /* Text style when checked */
+    color: #2A93EE;
     font-weight: 500;
   }
   
-  /* Optional Actions */
+  
+  /* ==================================================
+     MODAL ACTIONS - Optional Buttons (e.g., Cancel)
+     ================================================== */
+  
   .route-selection-actions {
     margin-top: 20px;
     display: flex;
     justify-content: flex-end;
   }
   
-  .route-selection-cancel {
+  .route-selection-cancel { /* Cancel button style */
     padding: 10px 20px;
     background-color: #f5f5f5;
     border: 1px solid #e0e0e0;
@@ -237,6 +273,6 @@
     font-size: 14px;
   }
   
-  .route-selection-cancel:hover {
+  .route-selection-cancel:hover { /* Cancel button hover */
     background-color: #e0e0e0;
   }

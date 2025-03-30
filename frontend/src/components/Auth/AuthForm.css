@@ -1,5 +1,9 @@
-.auth-form-overlay {
-    position: fixed; /* Use fixed to cover viewport */
+/* ==================================================
+   AUTH FORM OVERLAY - Full Page Overlay Container
+   ================================================== */
+
+   .auth-form-overlay {
+    position: fixed;
     top: 0;
     left: 0;
     right: 0;
@@ -8,25 +12,35 @@
     justify-content: center;
     align-items: center;
     background-color: rgba(0, 0, 0, 0.5);
-    z-index: 1100; /* High z-index */
-    animation: fadeInAuth 0.3s ease; /* Renamed animation */
+    z-index: 1100;
+    animation: fadeInAuth 0.3s ease;
   }
   
-  @keyframes fadeInAuth { /* Renamed animation */
+  @keyframes fadeInAuth { /* Fade-in animation for overlay */
     from { opacity: 0; }
     to { opacity: 1; }
   }
   
-  .auth-form-container { /* Renamed from .auth-form */
+  
+  /* ==================================================
+     AUTH FORM CONTAINER - Main Form Box
+     ================================================== */
+  
+  .auth-form-container {
     width: 90%;
     max-width: 400px;
     background-color: white;
     border-radius: 12px;
     box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
-    overflow: hidden; /* Clip content */
-    display: flex; /* Use flex for layout */
+    overflow: hidden;
+    display: flex;
     flex-direction: column;
   }
+  
+  
+  /* ==================================================
+     AUTH FORM HEADER - Header Section of Form
+     ================================================== */
   
   .auth-form-header {
     padding: 15px 20px;
@@ -34,86 +48,107 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    border-bottom: 1px solid #eee; /* Add border */
+    border-bottom: 1px solid #eee;
     flex-shrink: 0;
   }
   
-  .auth-form-header h2 {
+  .auth-form-header h2 { /* Form title in header */
     margin: 0;
     font-size: 18px;
     color: #333;
   }
   
-  .auth-close-button { /* Renamed from .close-button */
+  
+  /* ==================================================
+     CLOSE BUTTON - Style for Form Close Button
+     ================================================== */
+  
+  .auth-close-button {
     border: none;
     background: none;
     font-size: 24px;
     cursor: pointer;
     color: #666;
-    padding: 0; /* Remove padding */
-    width: 30px; /* Set size */
+    padding: 0;
+    width: 30px;
     height: 30px;
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 50%; /* Make it round */
+    border-radius: 50%;
     transition: background-color 0.2s;
   }
-  .auth-close-button .icon-img.small {
-    width: 16px; /* Control size */
+  
+  .auth-close-button .icon-img.small { /* Icon in close button */
+    width: 16px;
     height: 16px;
     display: block;
-    /* Optional: filter for color */
-    /* filter: invert(40%); */ /* Example: make it grey */
-  }
-  .auth-close-button:hover {
-    background-color: rgba(0,0,0,0.08);
-    color: #000; /* Darken icon on hover */
-  }
-  .auth-close-button:hover .icon-img.small {
-    filter: invert(10%); /* Example: make it darker */
   }
   
+  .auth-close-button:hover {
+    background-color: rgba(0,0,0,0.08);
+    color: #000;
+  }
+  
+  .auth-close-button:hover .icon-img.small { /* Icon hover effect */
+    filter: invert(10%);
+  }
+  
+  
+  /* ==================================================
+     FORM MESSAGES - Error and Success Messages
+     ================================================== */
   
   .auth-form-error,
   .auth-form-message {
-    margin: 10px 20px 0; /* Margin top only */
+    margin: 10px 20px 0;
     padding: 10px;
     border-radius: 5px;
     font-size: 14px;
     flex-shrink: 0;
   }
-  .auth-form-error {
+  
+  .auth-form-error { /* Error message style */
     background-color: #ffebee;
     color: #d32f2f;
-    border: 1px solid #e57373; /* Add border */
+    border: 1px solid #e57373;
   }
-  .auth-form-message {
+  
+  .auth-form-message { /* Success message style */
     background-color: #e8f5e9;
     color: #388e3c;
-    border: 1px solid #a5d6a7; /* Add border */
+    border: 1px solid #a5d6a7;
   }
   
   
-  .auth-form-body { /* Renamed from form */
+  /* ==================================================
+     AUTH FORM BODY - Main Content Area of Form
+     ================================================== */
+  
+  .auth-form-body {
     padding: 20px;
-    overflow-y: auto; /* Allow scrolling if content overflows */
+    overflow-y: auto;
   }
+  
+  
+  /* ==================================================
+     FORM GROUPS - Input Label and Input Container
+     ================================================== */
   
   .form-group {
     margin-bottom: 15px;
-    position: relative; /* Needed for password toggle */
+    position: relative; /* For password toggle positioning */
   }
   
-  .form-group label {
+  .form-group label { /* Form input labels */
     display: block;
     margin-bottom: 5px;
     color: #666;
     font-size: 14px;
-    font-weight: 500; /* Slightly bolder label */
+    font-weight: 500;
   }
   
-  .form-group input {
+  .form-group input { /* General form inputs */
     width: 100%;
     padding: 12px;
     border: 1px solid #ddd;
@@ -121,34 +156,40 @@
     font-size: 14px;
     transition: border-color 0.2s, box-shadow 0.2s;
   }
-  .form-group input:focus {
+  
+  .form-group input:focus { /* Input focus state */
     outline: none;
     border-color: #2A93EE;
     box-shadow: 0 0 0 2px rgba(42, 147, 238, 0.3);
   }
-  .form-group input:disabled {
+  
+  .form-group input:disabled { /* Disabled input state */
     background-color: #f5f5f5;
     cursor: not-allowed;
   }
   
   
-  /* Password Input Specifics */
-  .password-input-container { /* Wrapper for input + toggle */
+  /* ==================================================
+     PASSWORD INPUT - Specific Styles and Toggle
+     ================================================== */
+  
+  .password-input-container { /* Password input wrapper */
     position: relative;
   }
-  .form-group .password-input-container input { /* Ensure password input has padding */
+  
+  .form-group .password-input-container input { /* Password input spacing */
     padding-right: 40px;
   }
   
-  .password-visibility-toggle {
+  .password-visibility-toggle { /* Password visibility toggle button */
     position: absolute;
-    right: 1px; /* Position inside the input border */
-    top: 1px;   /* Position inside the input border */
-    bottom: 1px;/* Position inside the input border */
-    width: 38px; /* Width for the button */
+    right: 1px;
+    top: 1px;
+    bottom: 1px;
+    width: 38px;
     background: transparent;
     border: none;
-    border-radius: 0 7px 7px 0; /* Match input radius */
+    border-radius: 0 7px 7px 0;
     cursor: pointer;
     padding: 5px;
     display: flex;
@@ -158,41 +199,47 @@
     transition: background-color 0.2s;
   }
   
-  .password-visibility-toggle:hover {
+  .password-visibility-toggle:hover { /* Toggle hover state */
     background-color: rgba(0, 0, 0, 0.05);
   }
-  .password-visibility-toggle:focus {
-    outline: none; /* Remove default focus */
-    background-color: rgba(42, 147, 238, 0.1); /* Subtle focus */
+  
+  .password-visibility-toggle:focus { /* Toggle focus state */
+    outline: none;
+    background-color: rgba(42, 147, 238, 0.1);
   }
   
-  .eye-icon {
+  .eye-icon { /* Eye icon style */
     display: inline-block;
     width: 20px;
     height: 20px;
     background-size: contain;
     background-repeat: no-repeat;
     background-position: center;
-    opacity: 0.6; /* Slightly dim icon */
+    opacity: 0.6;
   }
-  .password-visibility-toggle:hover .eye-icon {
+  
+  .password-visibility-toggle:hover .eye-icon { /* Eye icon hover */
     opacity: 0.9;
   }
   
-  /* Eye icon SVGs (embedded as data URIs) */
-  .eye-icon.visible {
+  .eye-icon.visible { /* Visible eye icon SVG */
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z'%3E%3C/path%3E%3Ccircle cx='12' cy='12' r='3'%3E%3C/circle%3E%3C/svg%3E");
   }
-  .eye-icon.hidden {
+  
+  .eye-icon.hidden { /* Hidden eye icon SVG */
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24'%3E%3C/path%3E%3Cline x1='1' y1='1' x2='23' y2='23'%3E%3C/line%3E%3C/svg%3E");
   }
   
+  
+  /* ==================================================
+     FORM ACTIONS - Submit Button Area
+     ================================================== */
   
   .form-actions {
     margin-top: 20px;
   }
   
-  .submit-button {
+  .submit-button { /* Submit button style */
     width: 100%;
     padding: 12px;
     background-color: #2A93EE;
@@ -201,39 +248,46 @@
     border-radius: 8px;
     cursor: pointer;
     font-size: 16px;
-    font-weight: 500; /* Make submit button text slightly bolder */
+    font-weight: 500;
     transition: background-color 0.3s, opacity 0.3s;
   }
   
-  .submit-button:hover:not(:disabled) {
+  .submit-button:hover:not(:disabled) { /* Submit hover state */
     background-color: #1a81d6;
   }
-  .submit-button:disabled {
-    background-color: #a0cff8; /* Lighter blue when disabled */
+  
+  .submit-button:disabled { /* Submit disabled state */
+    background-color: #a0cff8;
     cursor: not-allowed;
     opacity: 0.7;
   }
   
-  .auth-switch-links { /* Renamed from .auth-switch */
-    margin-top: 20px; /* Increased margin */
+  
+  /* ==================================================
+     AUTH SWITCH LINKS - Links to Switch Auth Modes
+     ================================================== */
+  
+  .auth-switch-links {
+    margin-top: 20px;
     text-align: center;
     font-size: 14px;
     color: #666;
-    display: flex; /* Layout links */
+    display: flex;
     flex-direction: column;
-    gap: 8px; /* Space between links */
+    gap: 8px;
   }
   
-  .auth-switch-links button {
+  .auth-switch-links button { /* Switch auth mode buttons */
     background: none;
     border: none;
     color: #2A93EE;
     cursor: pointer;
     text-decoration: underline;
     padding: 0 5px;
-    font-size: 14px; /* Ensure consistent font size */
+    font-size: 14px;
   }
-  .auth-switch-links button:hover {
+  
+  .auth-switch-links button:hover { /* Switch link hover */
     color: #1a81d6;
-    text-decoration: none; /* Remove underline on hover */
+    text-decoration: none;
   }

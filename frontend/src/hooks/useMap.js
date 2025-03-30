@@ -1,233 +1,308 @@
-// frontend/src/hooks/useMap.js
 import { useState, useRef, useCallback, useEffect } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { toast } from 'react-hot-toast';
 
-const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_KEY;
-
-export const useMap = (mapContainerRef, setOriginValue, setDestinationValue) => { // <-- ADD setOriginValue, setDestinationValue AS PROPS
-  // Use a ref to hold the map instance to prevent issues with state updates
-  // during StrictMode double invocation. The state `mapIsReady` can signal readiness.
-  const mapInstanceRef = useRef(null);
-  const [mapIsReady, setMapIsReady] = useState(false); // Signal when map is truly ready
-
-  // ... other state/refs for markers/layers ...
-  const originMarker = useRef(null);
-  const destinationMarker = useRef(null);
-  const routeLayerRef = useRef(null);
-  const towerLayerRef = useRef(null);
-  const highlightLayerRef = useRef(null);
+// --- Environment Variable ---
+const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_KEY; // API Key for MapTiler service
 
 
-  // --- Initialization ---
-  // No longer useCallback needed here as it runs directly in useEffect
-  const initializeMap = () => {
-    // console.log("Attempting map initialization...");
-    // Check if map is already initialized via the ref
+/**
+ * useMap Hook
+ * 
+ * Custom React hook to manage a Leaflet map instance, including initialization,
+ * marker management, layer display (routes, towers, highlights), and view adjustments.
+ * Uses refs to manage the map instance and layers to avoid issues with React StrictMode.
+ */
+export const useMap = (mapContainerRef) => {
+  // --- Refs for Map and Layers ---
+  const mapInstanceRef = useRef(null);      // Ref to store the Leaflet map instance
+  const originMarkerRef = useRef(null);     // Ref for the origin marker layer
+  const destinationMarkerRef = useRef(null); // Ref for the destination marker layer
+  const routeLayerRef = useRef(null);       // Ref for the route polyline layer
+  const towerLayerRef = useRef(null);       // Ref for the cell tower layer group
+  const highlightLayerRef = useRef(null);   // Ref for the route segment highlight layer group
+
+  // --- State ---
+  const [mapIsReady, setMapIsReady] = useState(false); // State to signal when the map is initialized and ready
+
+
+  // --- Map Initialization Function ---
+  // This function creates the Leaflet map instance and adds base layers/controls.
+  // It's called by the useEffect hook below.
+  const initializeMap = useCallback(() => {
+    // console.log("[useMap] Attempting map initialization..."); // Debug log
+
+    // --- Guard Clauses: Prevent Re-initialization or Initialization Errors ---
     if (mapInstanceRef.current) {
-        // console.log("Map init skipped: Instance already exists in ref.");
-        return;
+      // console.log("[useMap] Map init skipped: Instance already exists in ref."); // Debug log
+      return; // Exit if map instance already exists
     }
-    // Check container ref and key
     if (!mapContainerRef.current || !L || !MAPTILER_KEY) {
-      // console.log("Map init skipped: Container ref or Leaflet/Key missing.");
-      // Log details
-      // console.log({ hasRef: !!mapContainerRef.current, L: !!L, key: !!MAPTILER_KEY });
-      return;
+      console.error("[useMap] Map init failed: Map container ref, Leaflet library, or MapTiler key is missing.");
+      // console.log({ hasRef: !!mapContainerRef.current, L: !!L, key: !!MAPTILER_KEY }); // Debug log details
+      toast.error("Map initialization failed: Missing dependencies.", { id: 'map-init-deps-error' });
+      return; // Exit if essential elements are missing
     }
-
-    // Check if the container already has a Leaflet instance attached (belt-and-suspenders)
+    // Extra check to see if Leaflet might have already attached itself to the container
     if (mapContainerRef.current._leaflet_id) {
-        console.warn("Map init skipped: Container element already has _leaflet_id.");
-        // Attempt to find the existing instance (though mapInstanceRef.current should ideally hold it)
-        // mapInstanceRef.current = mapContainerRef.current._leaflet_map; // Example, might not work reliably
-        // setMapIsReady(!!mapInstanceRef.current);
-        return;
+      console.warn("[useMap] Map init skipped: Container element already has a Leaflet ID (_leaflet_id). This might indicate a double initialization attempt.");
+      return; // Exit to prevent potential issues
     }
 
-
-    // console.log("Proceeding with L.map()...");
+    // --- Create Map Instance ---
+    // console.log("[useMap] Proceeding with L.map() initialization..."); // Debug log
     try {
       const mapInstance = L.map(mapContainerRef.current, {
-        zoomControl: false,
-        attributionControl: false,
-      }).setView([42.336687, -71.095762], 13);
+        zoomControl: false, // Disable default zoom control (added manually below)
+        attributionControl: false, // Disable default attribution (added manually below)
+      }).setView([42.336687, -71.095762], 13); // Set initial view (e.g., Boston)
 
-      // console.log("L.map() successful, adding tile layer...");
+      // console.log("[useMap] L.map() successful."); // Debug log
 
+      // --- Add Tile Layer ---
       L.tileLayer(
-         `https://api.maptiler.com/maps/dataviz/{z}/{x}/{y}.png?key=${MAPTILER_KEY}`,
-         { tileSize: 512, zoomOffset: -1, minZoom: 3, crossOrigin: true }
+        `https://api.maptiler.com/maps/dataviz/{z}/{x}/{y}.png?key=${MAPTILER_KEY}`, // MapTiler tile URL
+        {
+          tileSize: 512,
+          zoomOffset: -1,
+          minZoom: 3,
+          crossOrigin: true, // Important for CORS if tiles are hosted elsewhere
+          // attribution: '© <a href="https://www.maptiler.com/copyright/">MapTiler</a> © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' // Attribution handled by control
+        }
       ).addTo(mapInstance);
+      // console.log("[useMap] Tile layer added."); // Debug log
 
-      // console.log("Tile layer added, adding controls...");
+      // --- Add Map Controls ---
+      L.control.zoom({ position: 'topleft' }).addTo(mapInstance); // Add zoom control
+      L.control.attribution({ position: 'bottomright', prefix: false }).addTo(mapInstance); // Add attribution control
+      // console.log("[useMap] Controls added."); // Debug log
 
-      L.control.zoom({ position: 'topleft' }).addTo(mapInstance);
-      L.control.attribution({ position: 'bottomright', prefix: '<a href="https://leafletjs.com" title="A JS library for interactive maps">Leaflet</a>' }).addTo(mapInstance);
+      // --- Store Instance and Set Ready State ---
+      mapInstanceRef.current = mapInstance; // Store the initialized map instance in the ref
+      setMapIsReady(true); // Signal that the map is ready
+      // console.log("[useMap] Map instance stored in ref and map marked as ready."); // Debug log
 
-      // console.log("Controls added, setting map instance ref...");
-      mapInstanceRef.current = mapInstance; // Store instance in ref
-      setMapIsReady(true); // Set readiness state
-      // console.log("Map instance ref set and map marked as ready.");
-
-      // Invalidate size after a short delay
+      // --- Invalidate Size ---
+      // Sometimes needed after initial render or container size changes to ensure map tiles load correctly
       setTimeout(() => {
-          if (mapInstanceRef.current) { // Check ref still exists
-            // console.log("Invalidating map size...");
-            mapInstanceRef.current.invalidateSize();
-            // console.log("Map size invalidated.");
-          }
-      }, 100);
+        if (mapInstanceRef.current) { // Check ref still exists (component might unmount quickly)
+          // console.log("[useMap] Invalidating map size..."); // Debug log
+          mapInstanceRef.current.invalidateSize(); // Trigger map size recalculation
+          // console.log("[useMap] Map size invalidated."); // Debug log
+        }
+      }, 100); // Short delay allows container to settle
 
     } catch (error) {
       console.error("ERROR during Leaflet map initialization:", error);
-      toast.error("Map failed to initialize. Check console.", { id: 'map-init-error' });
-      mapInstanceRef.current = null; // Clear ref on error
-      setMapIsReady(false); // Mark as not ready
+      toast.error("Map failed to initialize. Please check the console for errors.", { id: 'map-init-error' });
+      mapInstanceRef.current = null; // Clear the ref on error
+      setMapIsReady(false); // Mark map as not ready
     }
-  };
+  }, [mapContainerRef]); // Dependency: mapContainerRef (should be stable)
 
-  // Effect for initialization and cleanup
+
+  // --- Initialization and Cleanup Effect ---
   useEffect(() => {
-    // Only initialize if the ref is set and map isn't already created
+    // Initialize map only if container ref is available and map instance doesn't exist yet
     if (mapContainerRef.current && !mapInstanceRef.current) {
-        // console.log("useMap useEffect: Initializing map.");
-        initializeMap();
+      // console.log("[useMap useEffect] Initializing map..."); // Debug log
+      initializeMap();
     }
 
-    // Cleanup function: This runs on unmount AND before re-running the effect in StrictMode
+    // --- Cleanup Function ---
+    // This function runs when the component unmounts or dependencies change (React StrictMode runs this twice in dev)
     return () => {
-      // console.log("useMap useEffect cleanup running...");
+      // console.log("[useMap useEffect cleanup] Running cleanup..."); // Debug log
       if (mapInstanceRef.current) {
-        // console.log("Removing Leaflet map instance on cleanup.");
+        // console.log("[useMap useEffect cleanup] Removing Leaflet map instance."); // Debug log
         try {
-            mapInstanceRef.current.remove(); // Call Leaflet's remove method
-        } catch(e) {
-            console.error("Error removing map during cleanup:", e);
+          mapInstanceRef.current.remove(); // Properly remove the Leaflet map instance
+        } catch (e) {
+          console.error("[useMap useEffect cleanup] Error removing map instance:", e);
         }
         mapInstanceRef.current = null; // Clear the ref
-        setMapIsReady(false); // Mark as not ready
+        setMapIsReady(false); // Reset ready state
       } else {
-          // console.log("Cleanup: No map instance found in ref to remove.");
+        // console.log("[useMap useEffect cleanup] No map instance found in ref to remove."); // Debug log
       }
     };
-  }, [mapContainerRef]); // Run only when the container ref changes (should be stable)
+  }, [mapContainerRef, initializeMap]); // Dependencies: container ref and the initialization function
 
 
-  // --- Marker Management (Now uses mapInstanceRef.current) ---
+  // --- Marker Management ---
   const updateMarker = useCallback((latlng, isOrigin) => {
-    const map = mapInstanceRef.current; // Get map from ref
-    if (!map) return null;
+    const map = mapInstanceRef.current; // Get map instance from ref
+    if (!map) return null; // Exit if map is not ready
 
-    const markerRef = isOrigin ? originMarker : destinationMarker; // Use refs for markers too
-    const iconHtml = `<div class="${isOrigin ? 'origin-marker' : 'destination-marker'}"></div>`;
-    const title = isOrigin ? "Origin" : "Destination";
+    const markerRef = isOrigin ? originMarkerRef : destinationMarkerRef; // Select the correct marker ref
+    const iconHtml = `<div class="${isOrigin ? 'origin-marker' : 'destination-marker'}"></div>`; // CSS class defines marker appearance
+    const title = isOrigin ? "Route Origin" : "Route Destination";
 
+    // --- Remove Marker if latlng is null/undefined ---
     if (!latlng) {
       if (markerRef.current) {
-        map.removeLayer(markerRef.current);
-        markerRef.current = null;
+        map.removeLayer(markerRef.current); // Remove existing marker from map
+        markerRef.current = null; // Clear the ref
       }
       return null;
     }
 
+    // --- Update Existing Marker ---
     if (markerRef.current) {
-      markerRef.current.setLatLng(latlng);
+      markerRef.current.setLatLng(latlng); // Update position of existing marker
       return markerRef.current;
-    } else {
-      try {
-        const icon = L.divIcon({ html: iconHtml, className: '', iconSize: [24, 24], iconAnchor: [12, 12] });
-        const newMarker = L.marker(latlng, { icon: icon, title: title, zIndexOffset: 1000 }).addTo(map);
-        markerRef.current = newMarker; // Store in ref
-        return newMarker;
-      } catch (error) { console.error("Failed to create marker:", error); return null; }
     }
-  }, []); // No dependency on map state
+    // --- Create New Marker ---
+    else {
+      try {
+        const icon = L.divIcon({
+          html: iconHtml,
+          className: '', // No extra container class needed
+          iconSize: [24, 24], // Size of the marker icon
+          iconAnchor: [12, 12], // Anchor point (center)
+        });
+        const newMarker = L.marker(latlng, {
+          icon: icon,
+          title: title,
+          zIndexOffset: 1000, // Ensure markers are above route lines
+        }).addTo(map);
+        markerRef.current = newMarker; // Store new marker in the ref
+        return newMarker;
+      } catch (error) {
+        console.error("Failed to create marker:", error);
+        return null;
+      }
+    }
+  }, []); // No dependencies needed as it uses refs
 
-  // --- Layer Management (Uses mapInstanceRef.current) ---
+
+  // --- Layer Management ---
+
+  // Display Route Polyline
   const displayRouteLine = useCallback((latLngs, options = {}) => {
     const map = mapInstanceRef.current;
-    if (!map || !Array.isArray(latLngs) || latLngs.length < 2) return;
-    if (routeLayerRef.current) { map.removeLayer(routeLayerRef.current); routeLayerRef.current = null; }
+    if (!map || !Array.isArray(latLngs) || latLngs.length < 2) return null; // Validate input
+
+    // Clear previous route line if it exists
+    if (routeLayerRef.current) {
+      try { map.removeLayer(routeLayerRef.current); } catch (e) { /* Ignore removal error */ }
+      routeLayerRef.current = null;
+    }
+
     try {
+      // Create and add new polyline
       const routeLine = L.polyline(latLngs, {
-        color: options.color || '#4285F4', // Default blue
+        className: options.className || 'route-line', // Use CSS class or defaults
+        color: options.color || '#4285F4',
         weight: options.weight || 5,
         opacity: options.opacity || 0.85,
         smoothFactor: 1,
-        ...(options.dashArray && { dashArray: options.dashArray })
+        ...(options.dashArray && { dashArray: options.dashArray }), // Conditionally add dashArray
       }).addTo(map);
-      routeLayerRef.current = routeLine;
+      routeLayerRef.current = routeLine; // Store ref to the new layer
       return routeLine;
-    } catch (error) { console.error("Error displaying route line:", error); return null; }
-  }, []);
-
-  const clearRouteLine = useCallback(() => {
-    const map = mapInstanceRef.current;
-    if (map && routeLayerRef.current) {
-      try { map.removeLayer(routeLayerRef.current); } catch (e) { /* Ignore */ }
-      routeLayerRef.current = null;
+    } catch (error) {
+      console.error("Error displaying route line:", error);
+      return null;
     }
   }, []);
 
-  const displayLayerGroup = useCallback((layerGroup, layerType) => {
+  // Clear Route Polyline
+  const clearRouteLine = useCallback(() => {
     const map = mapInstanceRef.current;
-    if (!map || !layerGroup) return;
-    let layerRef;
-    if (layerType === 'towers') layerRef = towerLayerRef;
-    else if (layerType === 'highlight') layerRef = highlightLayerRef;
-    else return;
-    if (layerRef.current) { try { map.removeLayer(layerRef.current); } catch(e) {} }
-    layerGroup.addTo(map);
-    layerRef.current = layerGroup;
+    if (map && routeLayerRef.current) {
+      try { map.removeLayer(routeLayerRef.current); } catch (e) { /* Ignore removal error */ }
+      routeLayerRef.current = null; // Clear the ref
+    }
   }, []);
 
+  // Display Generic Layer Group (Towers, Highlight)
+  const displayLayerGroup = useCallback((layerGroup, layerType) => {
+    const map = mapInstanceRef.current;
+    if (!map || !layerGroup) return; // Validate input
+
+    let layerRef; // Select the appropriate ref based on layerType
+    if (layerType === 'towers') layerRef = towerLayerRef;
+    else if (layerType === 'highlight') layerRef = highlightLayerRef;
+    else {
+      console.warn(`[useMap] Unknown layerType provided to displayLayerGroup: ${layerType}`);
+      return;
+    }
+
+    // Clear previous layer of the same type if it exists
+    if (layerRef.current) {
+      try { map.removeLayer(layerRef.current); } catch (e) { /* Ignore removal error */ }
+    }
+
+    layerGroup.addTo(map); // Add the new layer group to the map
+    layerRef.current = layerGroup; // Store ref to the new layer group
+  }, []);
+
+  // Clear Generic Layer Group (Towers, Highlight)
   const clearLayerGroup = useCallback((layerType) => {
     const map = mapInstanceRef.current;
     if (!map) return;
-    let layerRef;
+
+    let layerRef; // Select the appropriate ref based on layerType
     if (layerType === 'towers') layerRef = towerLayerRef;
     else if (layerType === 'highlight') layerRef = highlightLayerRef;
-    else return;
-    if (layerRef.current) { try { map.removeLayer(layerRef.current); } catch (e) {} }
-    layerRef.current = null;
+    else {
+      console.warn(`[useMap] Unknown layerType provided to clearLayerGroup: ${layerType}`);
+      return;
+    }
+
+    // Remove the layer if it exists
+    if (layerRef.current) {
+      try { map.removeLayer(layerRef.current); } catch (e) { /* Ignore removal error */ }
+      layerRef.current = null; // Clear the ref
+    }
   }, []);
 
-  // --- View Management (Uses mapInstanceRef.current) ---
+
+  // --- View Management ---
+
+  // Animate map view to a specific point and zoom level
   const flyTo = useCallback((latlng, zoom) => {
     const map = mapInstanceRef.current;
-    if (map && latlng) { map.flyTo(latlng, zoom || map.getZoom()); }
+    if (map && latlng) {
+      map.flyTo(latlng, zoom || map.getZoom()); // Use provided zoom or current zoom
+    }
   }, []);
 
+  // Adjust map view to fit geographical bounds
   const fitBounds = useCallback((bounds, options = {}) => {
     const map = mapInstanceRef.current;
     if (!map) return;
-    // ... (logic to handle bounds array or LatLngBounds object) ...
-     try {
-        const latLngBounds = (bounds?.isValid) ? bounds : L.latLngBounds(bounds);
-        if (latLngBounds.isValid()) {
-            map.fitBounds(latLngBounds, { padding: [50, 50], maxZoom: 16, ...options });
-        }
-     } catch (e) { console.error("Error fitting bounds:", e); }
+
+    try {
+      // Handle different bounds formats (Leaflet LatLngBounds object or array of coordinates)
+      const latLngBounds = (bounds?.isValid) ? bounds : L.latLngBounds(bounds);
+      if (latLngBounds.isValid()) {
+        map.fitBounds(latLngBounds, { padding: [50, 50], maxZoom: 16, ...options }); // Fit bounds with padding
+      } else {
+        console.warn("[useMap] Invalid bounds provided to fitBounds:", bounds);
+      }
+    } catch (e) {
+      console.error("Error fitting bounds:", e, bounds);
+    }
   }, []);
 
 
-  // --- Return ---
-  // Return the ref's current value and the readiness state
-  // Other functions now close over the ref and don't need map state as dependency
+  // --- Returned Values from Hook ---
   return {
-    map: mapInstanceRef.current, // Provide the current instance
-    mapIsReady, // Signal readiness
-    // initializeMap, // No longer need to expose this
+    map: mapInstanceRef.current, // Provide the current map instance (can be null initially)
+    mapIsReady,                  // Boolean indicating if the map is initialized
+    // Marker functions
     updateMarker,
+    // Route line functions
     displayRouteLine,
     clearRouteLine,
+    // Generic layer group functions (for towers, highlights)
     displayLayerGroup,
     clearLayerGroup,
+    // View functions
     flyTo,
     fitBounds,
-    setOriginValue,       // <-- RETURN THE SETTER FUNCTIONS
-    setDestinationValue,  // <-- RETURN THE SETTER FUNCTIONS
   };
 };

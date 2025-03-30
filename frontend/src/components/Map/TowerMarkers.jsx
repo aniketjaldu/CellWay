@@ -1,142 +1,193 @@
-import React, { useEffect, useRef, useMemo } from 'react'; // Import useMemo
+import React, { useEffect, useRef, useMemo } from 'react';
 import PropTypes from 'prop-types';
 import L from 'leaflet';
+
 import { formatDate } from '../../utils/formatting.js';
 
-const TowerMarkers = ({ map, towers }) => {
-  const layerRef = useRef(null);
-  const renderedMarkerIds = useRef(new Set());
+// Note: CSS classes like .cell-tower-marker, .strong, .medium, .weak, .along-route,
+// .tower-popup, .tower-popup-header, .signal-badge, .tower-popup-content
+// should be defined in a relevant CSS file (e.g., App.css or MapMarkers.css).
 
-  // Memoize based on tower IDs/coords
+
+/**
+ * TowerMarkers Component
+ * 
+ * Manages the rendering of cell tower markers on a Leaflet map.
+ * It efficiently adds, updates, and removes markers based on the provided tower data,
+ * using a memoized key to optimize updates. Includes popups with tower details.
+ */
+const TowerMarkers = ({ map, towers }) => {
+  const layerRef = useRef(null); // Ref to store the Leaflet layer group for tower markers
+  const renderedMarkerIds = useRef(new Set()); // Ref to track IDs of currently rendered markers
+
+  // --- Memoization for Efficient Updates ---
+  // Create a stable key based on tower IDs/coordinates to trigger effect only when data truly changes
   const towerDataKey = useMemo(() => {
-      return towers.map(t => `${t.id || t.lat + ',' + t.lon}`).join('|');
+    return towers.map(t => `${t.id || t.lat + ',' + t.lon}`).join('|');
   }, [towers]);
 
+
+  // --- Marker Rendering Effect ---
   useEffect(() => {
-    // console.log(`[TowerMarkers Effect] Running. Received ${towers.length} towers.`);
-    if (!map) return;
+    // console.log(`[TowerMarkers Effect] Running. Received ${towers.length} towers. Key: ${towerDataKey}`); // Debug log
+    if (!map) return; // Exit if map instance is not available
 
-    const newLayerGroup = layerRef.current || L.layerGroup();
-    const currentIds = new Set();
+    const newLayerGroup = layerRef.current || L.layerGroup(); // Use existing layer group or create a new one
+    const currentIds = new Set(); // Set to track IDs of towers in the current 'towers' prop
 
+
+    // --- Iterate and Add/Update Markers ---
     towers.forEach(tower => {
-      // Basic validation
+      // Basic validation for tower coordinates
       if (tower.lat == null || tower.lon == null) {
-          console.warn("[TowerMarkers] Skipping tower with invalid coords:", tower);
-          return;
+        console.warn("[TowerMarkers] Skipping tower with invalid coordinates:", tower);
+        return; // Skip this tower if coordinates are invalid
       }
 
-      const towerId = `${tower.id || tower.lat + ',' + tower.lon}`;
-      currentIds.add(towerId);
+      const towerId = `${tower.id || tower.lat + ',' + tower.lon}`; // Create a unique identifier for the tower
+      currentIds.add(towerId); // Add ID to the set of current towers
 
-      // Only add if not already rendered
+      // --- Add New Marker if Not Already Rendered ---
       if (!renderedMarkerIds.current.has(towerId)) {
-        const signalStrength = tower.averageSignal || -120; // Default weak
-        let signalClass = 'weak';
+        const signalStrength = tower.averageSignal || -120; // Default to weak signal if missing
+        let signalClass = 'weak'; // Determine CSS class based on signal strength
         if (signalStrength > -80) signalClass = 'strong';
         else if (signalStrength > -95) signalClass = 'medium';
 
-        // Check if distanceToRoute is valid number >= 0
+        // Check if the tower is marked as being along the route
         const isAlongRoute = typeof tower.distanceToRoute === 'number' && tower.distanceToRoute >= 0;
+
+        // Define HTML for the custom marker icon
         const iconHtml = `<div class="cell-tower-marker ${signalClass} ${isAlongRoute ? 'along-route' : ''}"></div>`;
 
         try {
-          const icon = L.divIcon({ html: iconHtml, className: '', iconSize: [12, 12], iconAnchor: [6, 6] });
-          const marker = L.marker([tower.lat, tower.lon], { icon: icon, zIndexOffset: 800 });
+          // Create a Leaflet DivIcon using the HTML
+          const icon = L.divIcon({
+            html: iconHtml,
+            className: '', // No extra container class needed
+            iconSize: [12, 12], // Size of the icon
+            iconAnchor: [6, 6], // Anchor point (center)
+          });
 
-          // --- Debug Popup Content Generation ---
-          let popupContent = '<div class="tower-popup">'; // Start popup div
+          // Create the marker
+          const marker = L.marker([tower.lat, tower.lon], {
+            icon: icon,
+            zIndexOffset: 800, // Ensure towers are potentially above route lines but below highlights/popups
+          });
 
-          // Header
+          // --- Build Popup Content ---
+          let popupContent = '<div class="tower-popup">'; // Start popup container
+
+          // Header section
           popupContent += '<div class="tower-popup-header">';
-          popupContent += `<strong>${tower.radio || 'Tower'}</strong>`;
-          // Ensure signalStrength is a number before adding badge
+          popupContent += `<strong>${tower.radio || 'Tower'}</strong>`; // Radio type or default 'Tower'
           if (typeof signalStrength === 'number' && !isNaN(signalStrength)) {
-              popupContent += `<span class="signal-badge ${signalClass}">${signalStrength} dBm</span>`;
+            popupContent += `<span class="signal-badge ${signalClass}">${signalStrength} dBm</span>`; // Signal strength badge
           }
           popupContent += '</div>'; // Close header
 
-          // Content
+          // Content section
           popupContent += '<div class="tower-popup-content">';
-          // Check each piece of data before adding
-          if (tower.mcc != null && tower.net != null) { // Check for null/undefined
-              popupContent += `<div><strong>Net:</strong> ${tower.mcc}-${tower.net}</div>`;
+          if (tower.mcc != null && tower.net != null) {
+            popupContent += `<div><strong>Net:</strong> ${tower.mcc}-${tower.net}</div>`; // Network info
           }
           if (tower.area != null && tower.cell != null) {
-              popupContent += `<div><strong>ID:</strong> ${tower.area}-${tower.cell}</div>`;
+            popupContent += `<div><strong>ID:</strong> ${tower.area}-${tower.cell}</div>`; // Cell ID info
           }
           if (tower.range != null && typeof tower.range === 'number') {
-              popupContent += `<div><strong>Range:</strong> ~${tower.range}m</div>`;
+            popupContent += `<div><strong>Range:</strong> ~${tower.range}m</div>`; // Estimated range
           }
-          // Check isAlongRoute flag which already checks distanceToRoute validity
           if (isAlongRoute) {
-              popupContent += `<div><strong>Route Dist:</strong> ${Math.round(tower.distanceToRoute)}m</div>`;
+            popupContent += `<div><strong>Route Dist:</strong> ${Math.round(tower.distanceToRoute)}m</div>`; // Distance to route
           }
-          if (tower.updated != null && typeof tower.updated === 'number' && tower.updated > 0) { // Check if updated is a valid timestamp
-              try {
-                  // Ensure formatDate handles potential errors
-                  const formattedDate = formatDate(new Date(tower.updated * 1000).toISOString());
-                  popupContent += `<div><strong>Updated:</strong> ${formattedDate}</div>`;
-              } catch (e) {
-                  console.error("Error formatting tower update date:", tower.updated, e);
-              }
+          if (tower.updated != null && typeof tower.updated === 'number' && tower.updated > 0) {
+            try {
+              const formattedDate = formatDate(new Date(tower.updated * 1000).toISOString()); // Format update time
+              popupContent += `<div><strong>Updated:</strong> ${formattedDate}</div>`;
+            } catch (e) {
+              console.error("Error formatting tower update date:", tower.updated, e); // Log date formatting errors
+            }
           }
           popupContent += '</div>'; // Close content
 
-          popupContent += '</div>'; // Close popup div
+          popupContent += '</div>'; // Close popup container
+          // --- End Popup Content ---
 
-          // Log the generated content for a sample tower
-          if (towerId.includes('mock') || Math.random() < 0.01) { // Log for mocks or ~1% of real towers
-            //  console.log(`[TowerMarkers] Popup content for ${towerId}:`, popupContent);
-          }
-          // --- End Debug ---
+          marker.bindPopup(popupContent, { minWidth: 160 }); // Bind the popup to the marker
+          marker.customId = towerId; // Store the ID on the marker object for removal logic
+          newLayerGroup.addLayer(marker); // Add the marker to the layer group
 
-          // Bind the generated HTML string
-          marker.bindPopup(popupContent, { minWidth: 160 });
-
-          marker.customId = towerId;
-          newLayerGroup.addLayer(marker);
-
-        } catch (error) { console.error("Error creating tower marker or popup:", error, tower); }
+        } catch (error) {
+          console.error("Error creating tower marker or popup:", error, tower); // Log errors during marker creation
+        }
       }
     });
 
-    // Remove old markers... (logic remains the same)
+
+    // --- Remove Old Markers ---
+    // Iterate through existing markers in the layer group
     if (layerRef.current) {
-        layerRef.current.eachLayer(layer => {
-            if (layer.customId && !currentIds.has(layer.customId)) {
-                newLayerGroup.removeLayer(layer);
-                // console.log(`[TowerMarkers] Removed marker with ID: ${layer.customId}`);
-            }
-        });
+      layerRef.current.eachLayer(layer => {
+        // If a rendered marker's ID is not in the set of current tower IDs, remove it
+        if (layer.customId && !currentIds.has(layer.customId)) {
+          newLayerGroup.removeLayer(layer); // Remove marker from the group
+          // console.log(`[TowerMarkers] Removed marker with ID: ${layer.customId}`); // Debug log
+        }
+      });
     }
-    
-    // Update layer ref... (logic remains the same)
-    if (!layerRef.current) { newLayerGroup.addTo(map); }
-    layerRef.current = newLayerGroup;
-    renderedMarkerIds.current = currentIds;
-    // console.log("[TowerMarkers Effect] renderedMarkerIds updated:", renderedMarkerIds.current); 
 
-  }, [map, towerDataKey]); // Dependency on memoized key
 
-  // Cleanup layer on unmount... (logic remains the same)
+    // --- Update Layer Group on Map ---
+    // Add the layer group to the map if it's the first render
+    if (!layerRef.current) {
+      newLayerGroup.addTo(map);
+    }
+    layerRef.current = newLayerGroup; // Update the ref to the current layer group
+    renderedMarkerIds.current = currentIds; // Update the ref tracking rendered IDs
+    // console.log("[TowerMarkers Effect] renderedMarkerIds updated:", renderedMarkerIds.current); // Debug log
+
+  }, [map, towerDataKey]); // Effect dependencies: map instance and the memoized tower data key
+
+
+  // --- Cleanup on Unmount Effect ---
   useEffect(() => {
+    // Return a cleanup function that runs when the component unmounts
     return () => {
       if (map && layerRef.current) {
-        // console.log("[TowerMarkers Cleanup Effect] Removing layer group from map on unmount.");
-        map.removeLayer(layerRef.current);
-        layerRef.current = null; // Optionally reset the ref
-        renderedMarkerIds.current.clear(); // Clear the rendered IDs set
+        // console.log("[TowerMarkers Cleanup Effect] Removing layer group from map on unmount."); // Debug log
+        map.removeLayer(layerRef.current); // Remove the entire layer group from the map
+        layerRef.current = null; // Clear the layer group ref
+        renderedMarkerIds.current.clear(); // Clear the set of rendered marker IDs
       }
     };
-  }, [map]);
+  }, [map]); // Dependency: map instance
 
+
+  // --- Component Rendering ---
+  // This component manages map layers directly and does not render any visible DOM elements itself
   return null;
 };
 
+
+// --- Prop Type Definitions ---
 TowerMarkers.propTypes = {
-  map: PropTypes.object, // Leaflet map instance
-  towers: PropTypes.array.isRequired,
+  map: PropTypes.object, // Leaflet map instance (required for interaction)
+  towers: PropTypes.arrayOf( // Array of tower data objects
+    PropTypes.shape({
+      lat: PropTypes.number,
+      lon: PropTypes.number,
+      id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]), // Optional ID
+      radio: PropTypes.string,
+      averageSignal: PropTypes.number,
+      mcc: PropTypes.number,
+      net: PropTypes.number,
+      area: PropTypes.number,
+      cell: PropTypes.number,
+      range: PropTypes.number,
+      updated: PropTypes.number,
+      distanceToRoute: PropTypes.number, // Optional distance marker
+    })
+  ).isRequired,
 };
 
 export default TowerMarkers;

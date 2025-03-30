@@ -1,4 +1,8 @@
-.map-controls-container { /* Renamed from .map-controls */
+/* ==================================================
+   MAP CONTROLS CONTAINER - Positioning and Layout
+   ================================================== */
+
+   .map-controls-container {
     position: absolute;
     bottom: 20px;
     right: 20px;
@@ -7,6 +11,11 @@
     flex-direction: column;
     gap: 12px;
   }
+  
+  
+  /* ==================================================
+     MAP CONTROL BUTTON - General Styles
+     ================================================== */
   
   .map-control-button {
     width: 44px;
@@ -20,65 +29,77 @@
     justify-content: center;
     cursor: pointer;
     transition: all 0.3s ease;
-    font-size: 22px; /* Icon size */
+    font-size: 22px; /* Default icon size */
     padding: 0;
     color: #333;
   }
   
-  .map-control-button:hover {
+  .map-control-button:hover { /* Hover state */
     transform: scale(1.05);
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
   }
   
-  /* Active state (e.g., tower toggle) */
-  .map-control-button.active {
+  
+  /* ==================================================
+     MAP CONTROL BUTTON - States (Active, Disabled)
+     ================================================== */
+  
+  .map-control-button.active { /* Active state (e.g., toggle on) */
     background-color: #2A93EE;
     color: white;
     box-shadow: 0 4px 12px rgba(42, 147, 238, 0.3);
   }
   
-  /* Disabled state */
-  .map-control-button.disabled {
+  .map-control-button.disabled { /* Disabled state */
     background-color: #e0e0e0;
     color: #999;
     cursor: not-allowed;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
   }
   
-  .map-control-button.disabled:hover {
+  .map-control-button.disabled:hover { /* Disabled hover state */
     transform: none;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
   }
   
-  /* Locate button specific styles */
+  
+  /* ==================================================
+     LOCATE BUTTON - Specific Styles and Animation
+     ================================================== */
+  
   .locate-button {
-    /* Base style is map-control-button */
+    /* Inherits base map-control-button styles */
   }
   
-  .locate-button.locating {
-    animation: pulseLocate 1.5s infinite; /* Renamed animation */
+  .locate-button.locating { /* Style when actively locating */
+    animation: pulseLocate 1.5s infinite;
   }
   
-  @keyframes pulseLocate { /* Renamed animation */
+  @keyframes pulseLocate { /* Animation for locating state */
     0% { transform: scale(1); }
     50% { transform: scale(1.1); }
     100% { transform: scale(1); }
   }
   
-  /* Route type button specific styles */
+  
+  /* ==================================================
+     ROUTE TYPE BUTTON - Specific Styles
+     ================================================== */
+  
   .route-type-button {
-    /* Base style is map-control-button */
-    font-size: 20px; /* Adjust emoji size if needed */
-    background-color: #fff; /* Ensure default background */
-    transition: all 0.3s ease;
+    /* Inherits base map-control-button styles */
   }
   
-  .route-type-button:hover:not(.disabled) { /* Only apply hover if not disabled */
+  .route-type-button:hover:not(.disabled) { /* Hover state (if not disabled) */
     background-color: #e8f4ff;
     transform: scale(1.05);
   }
   
-  /* Tower toggle button specific styles */
+  
+  /* ==================================================
+     TOWER TOGGLE BUTTON - Specific Styles
+     ================================================== */
+  
   .tower-toggle-button {
-     /* Base style is map-control-button */
+    /* Inherits base map-control-button styles */
   }

@@ -1,42 +1,50 @@
-.directions-panel-container {
+/* ==================================================
+   DIRECTIONS PANEL CONTAINER - Overall Panel Box
+   ================================================== */
+
+   .directions-panel-container {
     position: absolute;
     top: 10px;
     right: 10px;
-    width: 400px; /* Default width */
-    max-width: 90vw; /* Max width on smaller screens */
-    max-height: calc(100vh - 20px); /* Max height */
+    width: 400px;
+    max-width: 90vw;
+    max-height: calc(100vh - 20px);
     background-color: white;
     border-radius: 8px;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
     display: flex;
     flex-direction: column;
-    z-index: 900; /* Below modals, above map controls? */
-    overflow: hidden; /* Prevent content overflow */
-    transition: all 0.4s cubic-bezier(0.2, 0, 0.2, 1); /* Smooth transitions */
-    pointer-events: auto; /* Allow interaction */
+    z-index: 900;
+    overflow: hidden;
+    transition: all 0.4s cubic-bezier(0.2, 0, 0.2, 1);
+    pointer-events: auto;
   }
   
-  /* Minimized State */
+  
+  /* ==================================================
+     DIRECTIONS PANEL CONTAINER - Minimized State
+     ================================================== */
+  
   .directions-panel-container.minimized {
     width: 50px;
     height: 50px;
     overflow: hidden;
-    border-radius: 25px; /* Circular */
+    border-radius: 25px;
     background-color: white;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
     cursor: pointer;
-    padding: 0; /* Remove padding */
+    padding: 0;
   }
   
-  .directions-panel-container.minimized .directions-panel-header {
+  .directions-panel-container.minimized .directions-panel-header { /* Minimized header */
     padding: 0;
     border: none;
     height: 100%;
     width: 100%;
-    justify-content: center; /* Center the icon */
+    justify-content: center;
   }
   
-  .directions-toggle-icon { /* Icon in minimized state */
+  .directions-toggle-icon { /* Toggle icon in minimized state */
     color: #333;
     font-size: 22px;
     width: 100%;
@@ -46,7 +54,11 @@
     justify-content: center;
   }
   
-  /* Header */
+  
+  /* ==================================================
+     DIRECTIONS PANEL HEADER - Top Section with Title/Actions
+     ================================================== */
+  
   .directions-panel-header {
     padding: 10px 15px;
     background-color: #f8f8f8;
@@ -54,17 +66,17 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    flex-shrink: 0; /* Prevent header shrinking */
-    min-height: 50px; /* Ensure consistent height */
+    flex-shrink: 0;
+    min-height: 50px;
   }
   
-  .directions-title {
-    flex: 1; /* Take available space */
-    overflow: hidden; /* Prevent long names breaking layout */
-    margin-right: 10px; /* Space before actions */
+  .directions-title { /* Directions panel title */
+    flex: 1;
+    overflow: hidden;
+    margin-right: 10px;
   }
   
-  .direction-endpoints {
+  .direction-endpoints { /* Origin/Destination display */
     display: flex;
     font-size: 14px;
     align-items: center;
@@ -73,8 +85,9 @@
     gap: 4px;
   }
   
-  .direction-origin, .direction-destination {
-    max-width: 140px; /* Limit width */
+  .direction-origin, 
+  .direction-destination { /* Origin/Destination text styles */
+    max-width: 140px;
     overflow: hidden;
     text-overflow: ellipsis;
     font-weight: 600;
@@ -84,17 +97,22 @@
     color: white;
   }
   
-  .direction-origin { background-color: #2A93EE; }
-  .direction-destination { background-color: #EE2A2A; }
-  .direction-separator { margin: 0 4px; color: #666; font-size: 16px; }
+  .direction-origin { background-color: #2A93EE; } /* Origin color */
+  .direction-destination { background-color: #EE2A2A; } /* Destination color */
   
-  .directions-actions {
+  .direction-separator { /* Separator between Origin/Destination */
+    margin: 0 4px;
+    color: #666;
+    font-size: 16px;
+  }
+  
+  .directions-actions { /* Header action buttons container */
     display: flex;
     align-items: center;
     gap: 8px;
   }
   
-  .directions-action-button {
+  .directions-action-button { /* Header action buttons */
     background: none;
     border: none;
     font-size: 18px;
@@ -105,28 +123,37 @@
     align-items: center;
     justify-content: center;
     transition: background-color 0.2s;
-    color: #666; /* Default icon color */
+    color: #666;
   }
   
-  .directions-action-button:hover {
+  .directions-action-button:hover { /* Action button hover */
     background-color: rgba(0, 0, 0, 0.05);
   }
   
-  .directions-action-button.save-button {
-    font-size: 16px; /* Adjust if using icon font/SVG */
-  }
-  .directions-action-button.minimize-button {
-    font-weight: bold; /* Make dash thicker */
+  .directions-action-button.save-button { /* Save route button */
+    font-size: 16px;
   }
   
-  /* Content Area */
+  .directions-action-button.minimize-button { /* Minimize button */
+    font-weight: bold;
+  }
+  
+  
+  /* ==================================================
+     DIRECTIONS PANEL CONTENT - Scrollable Content Area
+     ================================================== */
+  
   .directions-panel-content {
-    overflow: hidden; /* Hide overflow, scrolling handled by inner container */
+    overflow: hidden;
     display: flex;
     flex-direction: column;
-    flex: 1; /* Take remaining height */
-    /* max-height calculation removed, flex handles it */
+    flex: 1;
   }
+  
+  
+  /* ==================================================
+     DIRECTIONS SUMMARY - Route Summary Information
+     ================================================== */
   
   .directions-summary {
     padding: 10px 15px;
@@ -136,38 +163,61 @@
     flex-wrap: wrap;
     gap: 15px;
     font-size: 13px;
-    flex-shrink: 0; /* Prevent summary shrinking */
+    flex-shrink: 0;
   }
   
-  .directions-summary > div {
-    margin-right: 10px; /* Spacing between items */
+  .directions-summary > div { /* Summary item spacing */
+    margin-right: 10px;
   }
   
-  /* Instruction List */
+  
+  /* ==================================================
+     INSTRUCTION LIST - Container and Scrollbar
+     ================================================== */
+  
   .instruction-list-container {
-    overflow-y: auto; /* Enable vertical scrolling */
-    flex: 1; /* Take remaining space */
-    padding: 0 5px 0 15px; /* Padding left/right */
+    overflow-y: auto;
+    flex: 1;
+    padding: 0 5px 0 15px;
     margin: 0;
-    /* Ensure this container doesn't interfere with map interactions */
     touch-action: pan-y;
     -ms-touch-action: pan-y;
     scrollbar-width: thin;
     scrollbar-color: #a8a8a8 #f1f1f1;
   }
-  .instruction-list-container::-webkit-scrollbar { width: 8px; }
-  .instruction-list-container::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
-  .instruction-list-container::-webkit-scrollbar-thumb { background-color: #a8a8a8; border-radius: 4px; border: 2px solid #f1f1f1; }
-  .instruction-list-container::-webkit-scrollbar-thumb:hover { background-color: #8a8a8a; }
+  
+  .instruction-list-container::-webkit-scrollbar {
+    width: 8px;
+  }
+  
+  .instruction-list-container::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+  }
+  
+  .instruction-list-container::-webkit-scrollbar-thumb {
+    background-color: #a8a8a8;
+    border-radius: 4px;
+    border: 2px solid #f1f1f1;
+  }
+  
+  .instruction-list-container::-webkit-scrollbar-thumb:hover {
+    background-color: #8a8a8a;
+  }
+  
+  
+  /* ==================================================
+     INSTRUCTION LIST - List and List Items
+     ================================================== */
   
   .instruction-list {
     list-style: none;
-    padding: 10px 0; /* Padding top/bottom */
+    padding: 10px 0;
     margin: 0;
   }
   
   .instruction-item {
-    padding: 12px 10px 12px 0; /* Adjust padding */
+    padding: 12px 10px 12px 0;
     margin-bottom: 8px;
     display: flex;
     align-items: flex-start;
@@ -176,21 +226,27 @@
     transition: background-color 0.2s ease;
     border-radius: 6px;
   }
-  .instruction-item:last-child {
+  
+  .instruction-item:last-child { /* Last item no bottom border */
     border-bottom: none;
   }
   
   .instruction-item:hover,
-  .instruction-item:focus { /* Add focus style */
+  .instruction-item:focus { /* Item hover and focus state */
     background-color: #f0f7ff;
-    outline: none; /* Remove default focus outline if custom style is applied */
+    outline: none;
   }
   
-  .instruction-item.active {
+  .instruction-item.active { /* Active instruction item */
     background-color: #e3f2fd;
     border-left: 3px solid #2A93EE;
-    padding-left: 7px; /* Adjust padding to account for border */
+    padding-left: 7px;
   }
+  
+  
+  /* ==================================================
+     INSTRUCTION ITEM - Icon and Text Content
+     ================================================== */
   
   .instruction-icon {
     min-width: 32px;
@@ -207,7 +263,34 @@
     flex-shrink: 0;
   }
   
-  /* Icon background colors (reuse from App.css) */
+  .instruction-text { /* Instruction text area */
+    flex: 1;
+    min-width: 0;
+  }
+  
+  .instruction-direction { /* Main direction text */
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 4px;
+    color: #333;
+  }
+  
+  .instruction-distance { /* Distance text below direction */
+    font-size: 12px;
+    color: #666;
+    margin-bottom: 2px;
+  }
+  
+  .instruction-item.no-directions .instruction-text { /* Style for no-directions item */
+    color: #888;
+    font-style: italic;
+  }
+  
+  
+  /* ==================================================
+     INSTRUCTION ICONS - Background Colors (Reused)
+     ================================================== */
+  
   .icon-straight, .icon-continue { background-color: #2a93ee1a; color: #2A93EE; }
   .icon-right, .icon-slight-right, .icon-sharp-right { background-color: #0f9d581a; color: #0F9D58; }
   .icon-left, .icon-slight-left, .icon-sharp-left { background-color: #ea43351a; color: #EA4335; }
@@ -215,28 +298,5 @@
   .icon-roundabout, .icon-rotary, .icon-exit-roundabout { background-color: #9c27b01a; color: #9C27B0; }
   .icon-arrive, .icon-destination { background-color: #ee2a2a1a; color: #EE2A2A; }
   .icon-depart, .icon-start { background-color: #2a93ee1a; color: #2A93EE; }
-  /* Add other icon types as needed */
-  .icon-default { background-color: #f1f1f1; color: #757575; }
   
-  .instruction-text {
-    flex: 1;
-    min-width: 0; /* Allow text to wrap */
-  }
-  
-  .instruction-direction {
-    font-size: 14px;
-    font-weight: 500;
-    margin-bottom: 4px;
-    color: #333;
-  }
-  
-  .instruction-distance {
-    font-size: 12px;
-    color: #666;
-    margin-bottom: 2px;
-  }
-  
-  .instruction-item.no-directions .instruction-text {
-    color: #888;
-    font-style: italic;
-  }
+  .icon-default { background-color: #f1f1f1; color: #757575; } /* Default icon style */

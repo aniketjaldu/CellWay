@@ -1,5 +1,8 @@
-/* Toggle Button */
-.search-button-container {
+/* ==================================================
+   SEARCH TOGGLE BUTTON - Top Center Button
+   ================================================== */
+
+   .search-button-container {
     position: absolute;
     top: 10px;
     left: 50%;
@@ -7,7 +10,7 @@
     z-index: 1000; /* Above map, below modals */
   }
   
-  .search-toggle-button { /* Renamed from .search-button */
+  .search-toggle-button {
     width: 45px;
     height: 45px;
     border-radius: 12px;
@@ -19,28 +22,30 @@
     justify-content: center;
     cursor: pointer;
     transition: all 0.3s ease;
-    font-size: 20px; /* Adjust if needed for SVG size */
+    font-size: 20px;
     padding: 0;
-    color: #333; /* Color for SVG fallback or text */
+    color: #333;
   }
   
-  .search-toggle-button .icon-img {
-    width: 20px; /* Control size */
+  .search-toggle-button .icon-img { /* Icon within toggle button */
+    width: 20px;
     height: 20px;
     display: block;
-    /* Optional: filter for color */
-    /* filter: invert(20%); */
   }
   
-  .search-toggle-button:hover {
+  .search-toggle-button:hover { /* Toggle button hover */
     transform: scale(1.05);
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
   }
   
-  /* Search Panel */
-  .search-panel-container { /* Renamed from .search-container */
+  
+  /* ==================================================
+     SEARCH PANEL CONTAINER - Main Panel Box
+     ================================================== */
+  
+  .search-panel-container {
     position: absolute;
-    top: 65px; /* Below toggle button */
+    top: 65px; /* Position below the toggle button */
     left: 50%;
     transform: translateX(-50%);
     width: 90%;
@@ -48,15 +53,20 @@
     background-color: white;
     border-radius: 16px;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
-    overflow: visible; /* Allow suggestions dropdown */
-    animation: slideDownSearch 0.3s ease; /* Renamed animation */
+    overflow: visible; /* Allow suggestions dropdown to overflow */
+    animation: slideDownSearch 0.3s ease;
     z-index: 1000; /* Same level as toggle button */
   }
   
-  @keyframes slideDownSearch { /* Renamed animation */
+  @keyframes slideDownSearch { /* Slide-down animation for panel */
     0% { transform: translateX(-50%) translateY(-20px); opacity: 0; }
     100% { transform: translateX(-50%) translateY(0); opacity: 1; }
   }
+  
+  
+  /* ==================================================
+     SEARCH PANEL CONTENT - Inner Padding and Header
+     ================================================== */
   
   .search-panel-content {
     padding: 20px;
@@ -73,34 +83,38 @@
     align-items: center;
   }
   
-  /* Input Styling */
-  .search-input-wrapper { /* Added wrapper for margin */
+  
+  /* ==================================================
+     SEARCH INPUTS - Wrapper, Group, and Input Styling
+     ================================================== */
+  
+  .search-input-wrapper {
     margin-bottom: 15px;
   }
   
-  .input-group {
+  .input-group { /* Container for input + clear button */
     background-color: #f8f9fa;
     border-radius: 12px;
     padding: 5px 12px;
     display: flex;
     align-items: center;
     transition: all 0.3s ease;
-    position: relative; /* Needed for suggestions and clear button */
+    position: relative;
     border: 1px solid #eaeaea;
   }
   
-  .input-group:focus-within {
+  .input-group:focus-within { /* Focus state for the entire group */
     background-color: #e8f0fe;
     box-shadow: 0 0 0 2px rgba(42, 147, 238, 0.5);
     border-color: #2A93EE;
   }
   
-  .input-container {
+  .input-container { /* Flex container for the input itself */
     flex: 1;
-    position: relative; /* For suggestions dropdown positioning */
+    position: relative;
   }
   
-  .input-group input {
+  .input-group input { /* Actual input field */
     width: 100%;
     padding: 14px 40px 14px 0; /* Right padding for clear button */
     border: none;
@@ -110,7 +124,11 @@
     outline: none;
   }
   
-  /* Clear Input Button */
+  
+  /* ==================================================
+     CLEAR INPUT BUTTON - Button to Clear Input Field
+     ================================================== */
+  
   .clear-input {
     position: absolute;
     right: 0px;
@@ -121,7 +139,7 @@
     font-size: 18px;
     color: #999;
     cursor: pointer;
-    width: 30px; /* Increased tap area */
+    width: 30px;
     height: 30px;
     display: flex;
     align-items: center;
@@ -131,20 +149,24 @@
     transition: all 0.2s ease;
   }
   
-  .clear-input:hover {
+  .clear-input:hover { /* Clear button hover */
     color: #333;
     background-color: rgba(0,0,0,0.05);
   }
   
-  /* Suggestions Dropdown */
+  
+  /* ==================================================
+     SUGGESTIONS DROPDOWN - Autocomplete Suggestions List
+     ================================================== */
+  
   .suggestions-dropdown {
     background-color: white;
     border-radius: 12px;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
     position: absolute;
-    top: 100%; /* Position below the input group */
-    left: -12px; /* Align with input group edge */
-    right: -12px; /* Align with input group edge */
+    top: 100%;
+    left: -12px;
+    right: -12px;
     z-index: 1005; /* Above panel content */
     max-height: 200px;
     overflow-y: auto;
@@ -152,34 +174,38 @@
     border: 1px solid #eaeaea;
   }
   
-  .suggestion-item {
+  .suggestion-item { /* Individual suggestion item */
     padding: 14px 16px;
     border-bottom: 1px solid #f1f1f1;
     cursor: pointer;
     font-size: 14px;
     transition: all 0.2s ease;
-    color: #333; /* Ensure text color */
+    color: #333;
   }
   
-  .suggestion-item:last-child {
+  .suggestion-item:last-child { /* Last item no border */
     border-bottom: none;
   }
   
-  .suggestion-item:hover {
+  .suggestion-item:hover { /* Suggestion hover state */
     background-color: #f0f7ff;
   }
   
-  /* Cell Tower Toggle Section (if kept in SearchPanel) */
+  
+  /* ==================================================
+     CELL TOWER TOGGLE - Section and Button Styling
+     ================================================== */
+  
   .cell-tower-toggle-section {
     margin-top: 20px;
-    margin-bottom: 16px; /* Consistent margin */
+    margin-bottom: 16px;
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 8px;
   }
   
-  .cell-tower-toggle-section .toggle-button { /* Reuse toggle button style */
+  .cell-tower-toggle-section .toggle-button { /* Toggle button style */
     display: flex;
     align-items: center;
     justify-content: center;
@@ -196,30 +222,34 @@
     max-width: 250px;
   }
   
-  .cell-tower-toggle-section .toggle-button:hover {
+  .cell-tower-toggle-section .toggle-button:hover { /* Toggle hover */
     background-color: #e0e0e0;
     transform: translateY(-2px);
   }
   
-  .cell-tower-toggle-section .toggle-button.active {
+  .cell-tower-toggle-section .toggle-button.active { /* Toggle active state */
     background-color: #2A93EE;
     color: white;
     border-color: #2A93EE;
     box-shadow: 0 4px 12px rgba(42, 147, 238, 0.3);
   }
   
-  .cell-tower-toggle-section .toggle-icon {
+  .cell-tower-toggle-section .toggle-icon { /* Icon within toggle button */
     font-size: 16px;
     margin-right: 8px;
   }
   
-  .tower-count-display { /* Renamed from .tower-count */
+  .tower-count-display { /* Tower count text below toggle */
     font-size: 13px;
     color: #666;
     margin-top: -2px;
   }
   
-  /* Loading Indicator */
+  
+  /* ==================================================
+     LOADING INDICATOR - Search Panel Loading State
+     ================================================== */
+  
   .search-loading-indicator {
     margin-top: 15px;
     text-align: center;

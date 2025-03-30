@@ -1,53 +1,72 @@
-.saved-routes-overlay {
-    position: fixed; /* Use fixed to cover viewport */
+/* ==================================================
+   SAVED ROUTES OVERLAY - Full Page Overlay Container
+   ================================================== */
+
+   .saved-routes-overlay {
+    position: fixed;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
     background-color: rgba(0, 0, 0, 0.5);
-    z-index: 1050; /* Above search/controls, below auth form? */
+    z-index: 1050; /* Above general UI, below auth/route type modals */
     display: flex;
     justify-content: center;
     align-items: center;
-    animation: fadeInSavedRoutes 0.3s ease; /* Renamed animation */
+    animation: fadeInSavedRoutes 0.3s ease;
   }
   
-  @keyframes fadeInSavedRoutes { /* Renamed animation */
+  @keyframes fadeInSavedRoutes { /* Overlay fade-in animation */
     from { opacity: 0; }
     to { opacity: 1; }
   }
   
-  .saved-routes-container { /* Renamed from .saved-routes */
+  
+  /* ==================================================
+     SAVED ROUTES CONTAINER - Main Modal Box
+     ================================================== */
+  
+  .saved-routes-container {
     background-color: white;
     border-radius: 8px;
     width: 90%;
     max-width: 500px;
-    max-height: 80vh; /* Limit height */
+    max-height: 80vh; /* Limit height to prevent overflow on small screens */
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-    display: flex; /* Use flex for layout */
+    display: flex;
     flex-direction: column;
-    overflow: hidden; /* Prevent content breaking border radius */
+    overflow: hidden; /* Clip content to border radius */
   }
+  
+  
+  /* ==================================================
+     SAVED ROUTES HEADER - Header Section of Modal
+     ================================================== */
   
   .saved-routes-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 15px 20px; /* Consistent padding */
+    padding: 15px 20px;
     border-bottom: 1px solid #e0e0e0;
-    flex-shrink: 0; /* Prevent header shrinking */
+    flex-shrink: 0;
   }
   
-  .saved-routes-header h2 {
+  .saved-routes-header h2 { /* Modal title */
     margin: 0;
-    font-size: 1.25rem; /* Adjusted size */
+    font-size: 1.25rem;
     color: #333;
   }
   
-  .saved-routes-close-button { /* Renamed from .close-button */
+  
+  /* ==================================================
+     SAVED ROUTES CLOSE BUTTON - Header Close Button Style
+     ================================================== */
+  
+  .saved-routes-close-button {
     background: none;
     border: none;
-    font-size: 1.5rem; /* Icon size */
+    font-size: 1.5rem;
     cursor: pointer;
     color: #666;
     padding: 0;
@@ -61,33 +80,48 @@
     border-radius: 50%;
     transition: background-color 0.2s;
   }
-  .saved-routes-close-button .icon-img.small {
-    width: 16px; /* Control size */
+  
+  .saved-routes-close-button .icon-img.small { /* Icon in close button */
+    width: 16px;
     height: 16px;
     display: block;
-    /* Optional: filter for color */
-    /* filter: invert(40%); */
   }
-  .saved-routes-close-button:hover {
+  
+  .saved-routes-close-button:hover { /* Close button hover */
     background-color: rgba(0,0,0,0.08);
     color: #000;
   }
-  .saved-routes-close-button:hover .icon-img.small {
-    /* Optional: change filter on hover */
+  
+  .saved-routes-close-button:hover .icon-img.small { /* Close button icon hover */
     filter: invert(10%);
   }
   
+  
+  /* ==================================================
+     SAVED ROUTES CONTENT - Scrollable List Area
+     ================================================== */
+  
   .saved-routes-content {
-    overflow-y: auto; /* Enable scrolling for content */
-    padding: 20px; /* Padding for the list */
-    flex-grow: 1; /* Allow content to take available space */
+    overflow-y: auto;
+    padding: 20px;
+    flex-grow: 1;
   }
+  
+  
+  /* ==================================================
+     ROUTES LIST - Container for Route Items
+     ================================================== */
   
   .routes-list {
     display: flex;
     flex-direction: column;
     gap: 15px;
   }
+  
+  
+  /* ==================================================
+     ROUTE ITEM - Individual Saved Route Card
+     ================================================== */
   
   .route-item {
     background-color: #f9f9f9;
@@ -102,59 +136,64 @@
   }
   
   .route-item:hover,
-  .route-item:focus { /* Add focus style */
+  .route-item:focus { /* Route item hover and focus state */
     background-color: #f0f0f0;
     transform: translateY(-2px);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    outline: none; /* Remove default focus outline */
-    border-color: #ccc; /* Slightly darker border on hover */
+    outline: none;
+    border-color: #ccc;
   }
   
-  .route-image {
+  
+  /* ==================================================
+     ROUTE ITEM - Image and Details
+     ================================================== */
+  
+  .route-image { /* Optional image preview */
     width: 100%;
-    height: 150px; /* Fixed height for consistency */
+    height: 150px;
     overflow: hidden;
     border-radius: 4px;
     margin-bottom: 10px;
     border: 1px solid #ddd;
-    background-color: #eee; /* Placeholder background */
+    background-color: #eee;
   }
   
-  .route-image img {
+  .route-image img { /* Image within the container */
     width: 100%;
     height: 100%;
-    object-fit: cover; /* Cover the area */
+    object-fit: cover;
     display: block;
   }
   
-  .route-details {
+  .route-details { /* Container for text details */
     display: flex;
     flex-direction: column;
     gap: 8px;
   }
   
-  .route-points {
+  .route-points { /* Origin and Destination container */
     display: flex;
     flex-direction: column;
     gap: 5px;
   }
   
   .route-origin,
-  .route-destination {
+  .route-destination { /* Origin/Destination text style */
     font-weight: 600;
     position: relative;
-    padding-left: 20px; /* Space for icon */
-    line-height: 1.3; /* Adjust line height */
-    overflow: hidden; /* Prevent long names breaking layout */
+    padding-left: 20px;
+    line-height: 1.3;
+    overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
   
-  .route-origin { color: #2563eb; }
-  .route-destination { color: #dc2626; }
+  .route-origin { color: #2563eb; } /* Origin text color */
+  .route-destination { color: #dc2626; } /* Destination text color */
   
   .route-origin::before,
-  .route-destination::before {
+  .route-destination::before { /* Origin/Destination icon marker */
     content: '';
     position: absolute;
     left: 0;
@@ -164,8 +203,14 @@
     height: 12px;
     border-radius: 50%;
   }
-  .route-origin::before { background-color: #2563eb; }
-  .route-destination::before { background-color: #dc2626; }
+  
+  .route-origin::before { background-color: #2563eb; } /* Origin marker color */
+  .route-destination::before { background-color: #dc2626; } /* Destination marker color */
+  
+  
+  /* ==================================================
+     ROUTE ITEM - Metadata (Type, Date)
+     ================================================== */
   
   .route-meta {
     display: flex;
@@ -176,23 +221,29 @@
     color: #666;
   }
   
-  .route-type {
+  .route-type { /* Route type display */
     display: flex;
     align-items: center;
     gap: 5px;
     text-transform: capitalize;
   }
   
-  .route-date {
+  .route-date { /* Date saved display */
     font-style: italic;
   }
   
-  .saved-routes-message { /* Renamed from .no-routes */
+  
+  /* ==================================================
+     SAVED ROUTES MESSAGE - No Routes/Error Message
+     ================================================== */
+  
+  .saved-routes-message {
     text-align: center;
     padding: 20px;
     color: #666;
   }
-  .saved-routes-message.error {
+  
+  .saved-routes-message.error { /* Error message style */
     color: #d32f2f;
     font-weight: 500;
   }

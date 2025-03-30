@@ -1,31 +1,42 @@
 import React, { forwardRef } from 'react';
 import PropTypes from 'prop-types';
+
 import './MapContainer.css'; // Import component-specific CSS
 
+
+/**
+ * MapContainer Component
+ * 
+ * A simple container component designed to hold the Leaflet map instance.
+ * It utilizes `forwardRef` to allow parent components to get a direct reference to the underlying DOM element,
+ * which is typically required for map initialization libraries like Leaflet.
+ */
 const MapContainer = forwardRef(({ className = '', children }, ref) => {
+
+  // Note: Removed temporary inline styles as these should be defined
+  //       and managed in the corresponding MapContainer.css file
+  //       for better separation of concerns and maintainability.
+
   return (
     <div
-      id="map"
-      ref={ref}
-      className={`map-container ${className}`}
-      // TEMPORARY INLINE STYLES FOR TESTING
-      style={{
-          position: 'absolute',
-          top: '0',
-          left: '0',
-          width: '100vw', // Use viewport width
-          height: '100vh', // Use viewport height
-          backgroundColor: 'lightgrey' // Add background to see the div
-      }}
+      id="map" // ID often used by map libraries to target the container
+      ref={ref} // Forwarded ref for map initialization
+      className={`map-container ${className}`} // Apply base class and any additional classes
     >
-      {children}
+      {children} {/* Allows rendering map controls or other elements inside */}
     </div>
   );
 });
 
+
+// --- Display Name for React DevTools ---
 MapContainer.displayName = 'MapContainer';
 
-// If you chose to remove prop-types, delete the PropTypes import and this block.
-// If using TypeScript, define props with an interface instead.
+
+// --- Prop Type Definitions ---
+MapContainer.propTypes = {
+  className: PropTypes.string, // Optional additional CSS classes to apply
+  children: PropTypes.node,    // Optional children elements to render within the container
+};
 
 export default MapContainer;
