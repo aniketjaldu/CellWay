@@ -13,7 +13,7 @@ When you open CellWay, you'll see:
 -   **Authentication Buttons:** Located usually on the bottom left, allowing you to Log In, Register, or access Saved Routes/Logout if logged in.
     
 
-![Diagram Placeholder: Show main screen with Map, Search Panel, Map Controls, Auth Buttons highlighted]
+![Main Page](/public/Main_Page.png)
 
 ## 3. Finding a Route
 This is the core functionality of CellWay.
@@ -23,7 +23,7 @@ This is the core functionality of CellWay.
 2.  **Enter Origin:** Click into the "Origin" input field and start typing an address, place name, or landmark. Suggestions will appear as you type.
 3.  **Select Origin Suggestion:** Click on the desired suggestion from the dropdown list. The map may pan to this location, and a marker (usually blue 🔵) will appear.
 4.  **Enter Destination:** Click into the "Destination" input field and type your destination address or place name.
-5.  **Select Destination Suggestion:** Click on the desired suggestion from the dropdown list. A marker (usually red 📍) will appear for the destination.
+5.  **Select Destination Suggestion:** Click on the desired suggestion from the dropdown list. A marker (usually red 🔴) will appear for the destination.
 6.  **Route Calculation:** Once both Origin and Destination are set, CellWay will automatically start calculating route options. A loading indicator might appear in the search panel.
     
 
@@ -41,7 +41,7 @@ After the origin and destination are set, CellWay calculates routes based on dif
 
 **Route Types Explained:**
 1.  **⚡️ Fastest:** This route prioritizes the shortest travel time, similar to standard navigation apps. (Displayed in Blue)
-2.  **📶 Cell Coverage:** This route attempts to find a path that maximizes estimated cell signal strength, based on available cell tower data. This might be slower than the fastest route. (Displayed in Green)
+2.  **📱 Cell Coverage:** This route attempts to find a path that maximizes estimated cell signal strength, based on available cell tower data. This might be slower than the fastest route. (Displayed in Green)
 3.  **⚖️ Balanced:** This route offers a compromise, trying to balance travel time with estimated cell signal quality. (Displayed in Yellow/Orange)
     
 
@@ -51,7 +51,7 @@ After the origin and destination are set, CellWay calculates routes based on dif
 -   **Remember Choice:** Check the box "Remember my choice..." if you want CellWay to automatically use the selected route type for future routes without showing the modal. Your preference is saved locally in your browser.
 
 **Changing Route Type (After Initial Selection):**
--   Click the **Route Type button** in the Map Controls (it shows the icon of the currently displayed route type: ⚡️, 📶, or ⚖️).
+-   Click the **Route Type button** in the Map Controls (it shows the icon of the currently displayed route type: ⚡️, 📱, or ⚖️).
 -   This will cycle through the available computed route types, updating the map display accordingly.
 -   Note: This button is only active when a route is currently displayed.
     
@@ -145,8 +145,8 @@ If you forget your password:
 Located typically in the bottom-right:
 
 -   **📍 Locate Me:** Attempts to find your current geographic location using your browser/device and sets it as the **Origin** point. You may need to grant location permissions.
--   **⚡️/📶/⚖️ Route Type:** (Only active when a route is displayed) Click to cycle through the available route optimization types (Fastest, Cell Coverage, Balanced). The icon changes to reflect the currently displayed type.
-   -   **📡 Cell Tower Toggle:** Click to show or hide cell tower markers on the map. The button may appear highlighted or active when towers are visible.
+-   **⚡️/📱/⚖️ Route Type:** (Only active when a route is displayed) Click to cycle through the available route optimization types (Fastest, Cell Coverage, Balanced). The icon changes to reflect the currently displayed type.
+-   **📡 Cell Tower Toggle:** Click to show or hide cell tower markers on the map. The button may appear highlighted or active when towers are visible.
     
 
 ## 10. Troubleshooting & Tips

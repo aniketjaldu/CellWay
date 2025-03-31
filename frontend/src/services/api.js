@@ -34,7 +34,7 @@ api.interceptors.response.use(
     const message = error.response?.data?.error || error.message; // Error message from backend or Axios error message
     const requestUrl = error.config?.url; // URL of the failed request
 
-    console.error(`API Error: Status ${status || 'Network Error'} on ${requestUrl} - ${message}`, error.config); // Log detailed error
+    // console.error(`API Error: Status ${status || 'Network Error'} on ${requestUrl} - ${message}`, error.config); // Log detailed error
 
     // --- Specific Status Code Handling ---
     if (status === 401) {

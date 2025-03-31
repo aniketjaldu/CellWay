@@ -64,11 +64,11 @@ export const useMap = (mapContainerRef) => {
       L.tileLayer(
         `https://api.maptiler.com/maps/dataviz/{z}/{x}/{y}.png?key=${MAPTILER_KEY}`, // MapTiler tile URL
         {
+          attribution: '© <a href="https://leafletjs.com/" target="_blank" rel="noopener noreferrer">Leaflet</a> © <a href="https://www.maptiler.com/copyright/" target="_blank" rel="noopener noreferrer">MapTiler</a> © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> © <a href="https://www.graphhopper.com/" target="_blank" rel="noopener noreferrer">GraphHopper</a> contributors.',
           tileSize: 512,
           zoomOffset: -1,
           minZoom: 3,
           crossOrigin: true, // Important for CORS if tiles are hosted elsewhere
-          // attribution: '© <a href="https://www.maptiler.com/copyright/">MapTiler</a> © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' // Attribution handled by control
         }
       ).addTo(mapInstance);
       // console.log("[useMap] Tile layer added."); // Debug log

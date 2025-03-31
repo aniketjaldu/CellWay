@@ -89,7 +89,7 @@ The application features user authentication, allowing users to save their frequ
 
 **Prerequisites:**
 
-*   Node.js and npm (or yarn)
+*   Node.js and npm
 *   Python 3.x and pip
 *   MongoDB instance (running locally or accessible via URI)
 
@@ -141,7 +141,6 @@ cd ../frontend
 
 # 2. Install Node.js dependencies
 npm install
-# or: yarn install
 
 # 3. Create a .env file in the frontend directory
 touch .env
@@ -177,8 +176,7 @@ Environment variables are used for configuration. Create .env files in both the 
     ```bash
     cd backend
     # Ensure virtual environment is activated
-    flask run --port=5001
-    # or potentially: python app.py
+    python app.py
     ```
     The backend should be running on http://localhost:5001.
     
@@ -186,7 +184,6 @@ Environment variables are used for configuration. Create .env files in both the 
     ```python
     cd frontend
     npm run dev
-    # or: yarn dev
     ```
     The frontend should be running on http://localhost:5173 (or another port specified by Vite).
     
