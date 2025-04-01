@@ -93,31 +93,3 @@
     outline: 4px auto -webkit-focus-ring-color;
   }
   
-  
-  /* ==================================================
-     COLOR SCHEME - Dark Mode Preference
-     ================================================== */
-  /* Styles applied when the user prefers a dark color scheme */
-  
-  @media (prefers-color-scheme: dark) {
-    body {
-      background-color: #242424; /* Dark background */
-      color: rgba(255, 255, 255, 0.87); /* Light text */
-    }
-  
-    button { /* Dark mode button adjustments */
-      background-color: #1a1a1a; /* Darker button background */
-      color: rgba(255, 255, 255, 0.87); /* Light button text */
-    }
-    button:hover {
-      border-color: #747bff; /* Adjusted hover border for dark */
-      background-color: #333333; /* Darker hover */
-    }
-  
-    a { /* Dark mode link adjustments */
-      color: #747bff; /* Brighter link color */
-    }
-    a:hover {
-      color: #9d9ff5; /* Lighter link hover color */
-    }
-  }
