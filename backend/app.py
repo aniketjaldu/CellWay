@@ -91,12 +91,14 @@ def create_app(config_class=Config) -> Flask:
     from routes.geo_routes import geo_bp  # Import geocoding blueprint
     from routes.routing_routes import routing_bp  # Import routing blueprint
     from routes.tower_routes import tower_bp  # Import tower data blueprint
+    from routes.map_routes import map_bp  # Import map blueprint
 
     app.register_blueprint(auth_bp, url_prefix="/api")  # Register authentication blueprint under /api prefix
     app.register_blueprint(geo_bp, url_prefix="/api")  # Register geocoding blueprint under /api prefix
     app.register_blueprint(routing_bp, url_prefix="/api")  # Register routing blueprint under /api prefix
     app.register_blueprint(tower_bp, url_prefix="/api")  # Register tower data blueprint under /api prefix
-    log.info("Registered API blueprints for authentication, geocoding, routing, and tower data.")
+    app.register_blueprint(map_bp, url_prefix="/api")  # Register map blueprint under /api prefix
+    log.info("Registered API blueprints for authentication, geocoding, routing, tower data, and map configuration.")
 
     # --- Define Test Endpoint ---
     @app.route("/api/ping")  # Define a simple ping endpoint for API testing

@@ -211,6 +211,23 @@ export const fetchTowers = (minLat, minLng, maxLat, maxLng) => {
   });
 };
 
+// --- Map API ---
+/**
+ * Fetches map configuration from the backend.
+ * This includes API keys, initial view settings, and other map options.
+ * 
+ * @returns {Promise<Object>} Map configuration object
+ */
+export const getMapConfig = async () => {
+  try {
+    const response = await api.get('/map/config');
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching map configuration:', error);
+    throw error;
+  }
+};
+
 // --- Default Export ---
 // Export the configured Axios instance if it needs to be used directly elsewhere (e.g., for custom requests).
 // However, it's generally better practice to use the exported endpoint functions.
