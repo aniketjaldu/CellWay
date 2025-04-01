@@ -45,110 +45,115 @@ export const useMap = (mapContainerRef) => {
   }, []);
 
 
-  // --- Map Initialization Function ---
-  // This function creates the Leaflet map instance and adds base layers/controls.
-  // It's called by the useEffect hook below.
-  const initializeMap = useCallback(async () => {
-    // console.log("[useMap] Attempting map initialization..."); // Debug log
-
-    // --- Guard Clauses: Prevent Re-initialization or Initialization Errors ---
-    if (mapInstanceRef.current) {
-      // console.log("[useMap] Map init skipped: Instance already exists in ref."); // Debug log
-      return; // Exit if map instance already exists
-    }
-    
-    // Ensure we have a configuration before proceeding
-    const config = mapConfig || await fetchMapConfig();
-    
-    if (!mapContainerRef.current || !L || !config) {
-      console.error("[useMap] Map init failed: Map container ref, Leaflet library, or map configuration is missing.");
-      toast.error("Map initialization failed: Missing dependencies.", { id: 'map-init-deps-error' });
-      return; // Exit if essential elements are missing
-    }
-    
-    // Extra check to see if Leaflet might have already attached itself to the container
-    if (mapContainerRef.current._leaflet_id) {
-      console.warn("[useMap] Map init skipped: Container element already has a Leaflet ID (_leaflet_id). This might indicate a double initialization attempt.");
-      return; // Exit to prevent potential issues
-    }
-
-    // --- Create Map Instance ---
-    // console.log("[useMap] Proceeding with L.map() initialization..."); // Debug log
-    try {
-      const { initial_view, tile_layer, controls } = config;
-      
-      const mapInstance = L.map(mapContainerRef.current, {
-        zoomControl: false, // Disable default zoom control (added manually below)
-        attributionControl: false, // Disable default attribution (added manually below)
-      }).setView(initial_view.center, initial_view.zoom); // Set initial view from config
-
-      // console.log("[useMap] L.map() successful."); // Debug log
-
-      // --- Add Tile Layer ---
-      L.tileLayer(
-        tile_layer.url, // Tile layer URL from config
-        tile_layer.options // Tile layer options from config
-      ).addTo(mapInstance);
-      // console.log("[useMap] Tile layer added."); // Debug log
-
-      // --- Add Map Controls ---
-      L.control.zoom(controls.zoom).addTo(mapInstance); // Add zoom control with config
-      L.control.attribution(controls.attribution).addTo(mapInstance); // Add attribution control with config
-      // console.log("[useMap] Controls added."); // Debug log
-
-      // --- Store Instance and Set Ready State ---
-      mapInstanceRef.current = mapInstance; // Store the initialized map instance in the ref
-      setMapIsReady(true); // Signal that the map is ready
-      // console.log("[useMap] Map instance stored in ref and map marked as ready."); // Debug log
-
-      // --- Invalidate Size ---
-      // Sometimes needed after initial render or container size changes to ensure map tiles load correctly
-      setTimeout(() => {
-        if (mapInstanceRef.current) { // Check ref still exists (component might unmount quickly)
-          // console.log("[useMap] Invalidating map size..."); // Debug log
-          mapInstanceRef.current.invalidateSize(); // Trigger map size recalculation
-          // console.log("[useMap] Map size invalidated."); // Debug log
-        }
-      }, 100); // Short delay allows container to settle
-
-    } catch (error) {
-      console.error("ERROR during Leaflet map initialization:", error);
-      toast.error("Map failed to initialize. Please check the console for errors.", { id: 'map-init-error' });
-      mapInstanceRef.current = null; // Clear the ref on error
-      setMapIsReady(false); // Mark map as not ready
-    }
-  }, [mapContainerRef, mapConfig, fetchMapConfig]); // Dependencies include mapConfig and fetchMapConfig now
-
-
   // --- Initialization and Cleanup Effect ---
   useEffect(() => {
-    // Fetch configuration then initialize map
-    if (mapContainerRef.current && !mapInstanceRef.current) {
-      // If we don't have the config yet, fetch it first
-      if (!mapConfig) {
-        fetchMapConfig().then(() => {
-          // Map will be initialized once mapConfig state is updated
-        });
-      } else {
-        // We already have the config, initialize the map
-        initializeMap();
-      }
-    }
-
-    // --- Cleanup Function ---
-    // This function runs when the component unmounts or dependencies change
-    return () => {
-      if (mapInstanceRef.current) {
-        try {
-          mapInstanceRef.current.remove(); // Properly remove the Leaflet map instance
-        } catch (e) {
-          console.error("[useMap useEffect cleanup] Error removing map instance:", e);
+    let initializationInProgress = false;
+    let didCancel = false;
+    
+    const attemptInitialization = async () => {
+      // Set flag to prevent concurrent initialization attempts
+      if (initializationInProgress) return;
+      initializationInProgress = true;
+      
+      try {
+        // Check if map already exists
+        if (mapInstanceRef.current) {
+          // console.log("[useMap] Map already initialized, skipping initialization");
+          return;
         }
-        mapInstanceRef.current = null; // Clear the ref
-        setMapIsReady(false); // Reset ready state
+        
+        // Get config (use existing or fetch new)
+        let config = mapConfig;
+        if (!config) {
+          // console.log("[useMap] Fetching map configuration...");
+          config = await fetchMapConfig();
+          if (didCancel) return;
+          
+          if (!config) {
+            console.error("[useMap] Failed to fetch valid map configuration");
+            toast.error("Could not load map configuration. Please refresh the page.");
+            return;
+          }
+        }
+        
+        // Safety check after async operation
+        if (didCancel || mapInstanceRef.current) return;
+        
+        // Ensure DOM element is ready and clean
+        if (!mapContainerRef.current) {
+          console.error("[useMap] Map container ref is not available");
+          return;
+        }
+        
+        // Clean up any existing Leaflet elements
+        if (mapContainerRef.current._leaflet_id) {
+          console.warn("[useMap] Container has existing Leaflet ID - cleaning up");
+          try {
+            // Remove any leaflet classes and reset
+            const container = mapContainerRef.current;
+            container.innerHTML = '';
+            delete container._leaflet_id;
+          } catch (e) {
+            console.error("[useMap] Error cleaning container:", e);
+          }
+        }
+        
+        // Create map instance
+        // console.log("[useMap] Creating new Leaflet map instance");
+        const { initial_view, tile_layer, controls } = config;
+        
+        const mapInstance = L.map(mapContainerRef.current, {
+          zoomControl: false,
+          attributionControl: false,
+        }).setView(initial_view.center, initial_view.zoom);
+        
+        L.tileLayer(tile_layer.url, tile_layer.options).addTo(mapInstance);
+        L.control.zoom(controls.zoom).addTo(mapInstance);
+        L.control.attribution(controls.attribution).addTo(mapInstance);
+        
+        // Save reference and update state
+        mapInstanceRef.current = mapInstance;
+        if (!didCancel) {
+          setMapIsReady(true);
+          // console.log("[useMap] Map initialization complete and ready");
+          
+          // Invalidate size after a short delay
+          setTimeout(() => {
+            if (mapInstanceRef.current && !didCancel) {
+              mapInstanceRef.current.invalidateSize();
+            }
+          }, 100);
+        }
+      } catch (error) {
+        console.error("[useMap] Error initializing map:", error);
+        toast.error("Map failed to initialize. Please refresh the page.");
+      } finally {
+        initializationInProgress = false;
       }
     };
-  }, [mapContainerRef, initializeMap, mapConfig, fetchMapConfig]); // Dependencies include mapConfig and fetchMapConfig
+    
+    // Begin initialization if conditions are met
+    if (mapContainerRef.current && !mapInstanceRef.current && !initializationInProgress) {
+      attemptInitialization();
+    }
+    
+    // Cleanup function when component unmounts or deps change
+    return () => {
+      didCancel = true; // Mark any ongoing async operations as cancelled
+      
+      // Clean up map instance if it exists
+      if (mapInstanceRef.current) {
+        try {
+          // console.log("[useMap] Cleaning up map instance");
+          mapInstanceRef.current.remove();
+        } catch (e) {
+          console.error("[useMap] Error during map cleanup:", e);
+        }
+        mapInstanceRef.current = null;
+        setMapIsReady(false);
+      }
+    };
+  }, [mapContainerRef, mapConfig, fetchMapConfig]);
 
 
   // --- Marker Management ---

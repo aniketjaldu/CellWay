@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Routes, Route } from 'react-router-dom'; // Use Routes and Route for page/overlay routing
-import { Toaster } from 'react-hot-toast'; // Library for displaying notifications
+import { Toaster, toast } from 'react-hot-toast'; // Library for displaying notifications
 import L from 'leaflet'; // Leaflet library (needed for L.LatLng)
 
 // --- Hooks ---
@@ -67,6 +67,8 @@ function App() {
   // --- Refs ---
   const mapContainerRef = useRef(null); // Ref attached to the MapContainer's div element
 
+  // --- State for location tracking ---
+  const [isLocating, setIsLocating] = useState(false);
 
   // --- Custom Hooks Integration ---
   // Initialize and use custom hooks to manage different domains of state and logic
@@ -101,7 +103,7 @@ function App() {
   } = useTowers(map, routeGeometryForTowers);
 
   // Map Interaction Hook (depends on map)
-  const { isLocating, locateUser, preventMapInteraction } = useMapInteraction(map, handleLocationFound); // Pass location found callback
+  const { isBlockingInteraction, preventMapInteraction } = useMapInteraction(map, mapContainerRef);
 
 
   // ==================================================
@@ -485,6 +487,74 @@ function App() {
   };
 
 
+  // --- User Location Function ---
+  // Gets the user's location and performs reverse geocoding through the backend API
+  const locateUser = useCallback(() => {
+    // --- Guard Clauses ---
+    if (!mapIsReady || !map) {
+      toast.error("Map is not ready yet. Please wait a moment.", { id: 'locate-no-map' });
+      return; // Exit if map instance is not available or not ready
+    }
+    if (!('geolocation' in navigator)) {
+      toast.error('Geolocation is not supported by your browser.', { id: 'locate-unsupported' });
+      return; // Exit if browser doesn't support geolocation
+    }
+
+    // --- Start Locating Process ---
+    setIsLocating(true); // Set loading state
+    const locateToastId = toast.loading("Getting your location...", { id: 'locate-start' }); // Show loading notification
+
+    navigator.geolocation.getCurrentPosition(
+      // --- Success Callback ---
+      async (position) => {
+        const { latitude, longitude } = position.coords; // Extract coordinates
+        const latlng = L.latLng(latitude, longitude); // Create Leaflet LatLng object
+        let placeName = `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`; // Default place name is coordinates
+
+        // --- Reverse Geocoding via Backend API ---
+        try {
+          // Use the API service to make the request instead of direct fetch
+          const response = await api.reverseGeocodeCoords(latitude, longitude);
+          
+          // Process the response data
+          if (response?.data?.features?.[0]?.place_name) {
+            placeName = response.data.features[0].place_name;
+          }
+        } catch (error) {
+          console.error('Reverse geocoding error:', error); // Log reverse geocoding errors
+        } finally {
+          // --- Finalize Locating Process ---
+          toast.success('Location found!', { id: locateToastId }); // Update notification to success
+          setIsLocating(false); // Clear loading state
+          // Call the handler to process the location data
+          handleLocationFound({ lat: latitude, lng: longitude, name: placeName, latlng: latlng });
+        }
+      },
+      // --- Error Callback ---
+      (error) => {
+        console.error('Geolocation error:', error); // Log geolocation error
+        // Show specific error message based on error code
+        let errorMsg = `Could not get location: ${error.message}`;
+        if (error.code === error.PERMISSION_DENIED) {
+          errorMsg = "Location permission denied. Please enable location services for this site.";
+        } else if (error.code === error.POSITION_UNAVAILABLE) {
+          errorMsg = "Location information is unavailable.";
+        } else if (error.code === error.TIMEOUT) {
+          errorMsg = "Getting location timed out. Please try again.";
+        }
+        toast.error(errorMsg, { id: locateToastId }); // Update notification with error message
+        setIsLocating(false); // Clear loading state
+      },
+      // --- Geolocation Options ---
+      {
+        enableHighAccuracy: true, // Request high accuracy
+        timeout: 10000,           // Set timeout to 10 seconds
+        maximumAge: 0,            // Do not use cached position
+      }
+    );
+  }, [map, mapIsReady, handleLocationFound]); // Dependencies: map instance, mapIsReady state, and the callback function
+
+
   // ==================================================
   //               Render Logic
   // ==================================================
@@ -495,6 +565,12 @@ function App() {
 
       {/* --- Map Container and Overlays --- */}
       <MapContainer ref={mapContainerRef} className={showAuthForm || showSavedRoutes ? 'map-interactions-disabled' : ''}>
+        {!mapIsReady && (
+          <div className="map-loading-overlay">
+            <div className="map-loading-message">Loading map...</div>
+          </div>
+        )}
+        
         {/* Render map-specific overlays (Towers, Highlights) only when map is ready */}
         {mapIsReady && map && (
           <>
@@ -554,7 +630,7 @@ function App() {
       />
 
       {/* --- Map Controls --- */}
-      <MapControls
+      {mapIsReady && map && <MapControls
         isLocating={isLocating}
         onLocate={locateUser}
         isTowersVisible={showTowers}
@@ -572,7 +648,7 @@ function App() {
           }
         }}
         isRouteActive={!!routeInfo} // Enable button only if a route is active
-      />
+      />}
 
       {/* --- Directions Panel --- */}
       <DirectionsPanel
