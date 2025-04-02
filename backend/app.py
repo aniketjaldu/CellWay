@@ -37,21 +37,43 @@ def create_app(config_class=Config) -> Flask:
     # Initialize extensions
     mail.init_app(app)  # Initialize Flask-Mail with the app
     
-    # Initialize CORS with more permissive settings for debugging
-    CORS(app, resources={r"/api/*": {"origins": "*"}}, supports_credentials=True)
-    
+    # Simple, direct CORS configuration
     @app.after_request
-    def add_cors_headers(response):
-        response.headers.add('Access-Control-Allow-Origin', '*')
-        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
-        response.headers.add('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS')
-        response.headers.add('Access-Control-Allow-Credentials', 'true')
+    def cors_response(response):
+        # Always allow the frontend domain
+        response.headers.set('Access-Control-Allow-Origin', 'https://www.cellway.tech')
+        response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
+        response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+        response.headers.set('Access-Control-Allow-Credentials', 'true')
+        return response
+        
+    # Handle OPTIONS requests explicitly
+    @app.route('/api/<path:path>', methods=['OPTIONS'])
+    def handle_preflight(path):
+        response = app.make_default_options_response()
+        response.headers.set('Access-Control-Allow-Origin', 'https://www.cellway.tech')
+        response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
+        response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+        response.headers.set('Access-Control-Allow-Credentials', 'true')
         return response
     
     # Add health check endpoint
     @app.route("/health", methods=["GET"])
     def health_check():
         return jsonify({"status": "ok", "message": "API is running!"})
+        
+    # Debug endpoint to test CORS
+    @app.route("/api/debug/cors", methods=["GET"])
+    def debug_cors():
+        return jsonify({
+            "message": "CORS configured correctly",
+            "headers_set": {
+                "Access-Control-Allow-Origin": "https://www.cellway.tech",
+                "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+                "Access-Control-Allow-Headers": "Content-Type, Authorization",
+                "Access-Control-Allow-Credentials": "true"
+            }
+        })
     
     # Register API Blueprints
     from routes.auth_routes import auth_bp
@@ -70,12 +92,3 @@ def create_app(config_class=Config) -> Flask:
     register_error_handlers(app)
     
     return app
-
-
-# --- Application Execution Entry Point ---
-if __name__ == "__main__":
-    app = create_app()  # Create Flask application instance
-    # --- Start Flask Development Server ---
-    log.info("Starting Flask development server...")
-    app.run(debug=True, host="0.0.0.0", port=5001)  # Run Flask app in debug mode on all interfaces (for container access)
-    # --- NOTE: Use production-ready WSGI server (e.g., gunicorn, waitress) for production deployments. ---

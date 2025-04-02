@@ -1,23 +1,18 @@
 import axios from 'axios';
 
-const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL,
+// Add CORS proxy until backend is fixed
+const corsProxy = "https://corsproxy.io/?";
+const baseURL = import.meta.env.VITE_API_BASE_URL;
+const apiURL = process.env.NODE_ENV === 'production' 
+    ? `${corsProxy}${encodeURIComponent(baseURL)}` 
+    : baseURL;
+
+const api = axios.create({
+  baseURL: apiURL,
   headers: {
     'Content-Type': 'application/json',
   },
-  withCredentials: false, // Change to false for now
+  withCredentials: false, // Change to false to avoid CORS preflight complexity
 });
 
-// Add default handling for 5xx errors
-apiClient.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.message === 'Network Error' || error.response?.status >= 500) {
-      console.error('Backend server error:', error);
-      // You could show a toast or notification here
-    }
-    return Promise.reject(error);
-  }
-);
-
-export default apiClient;
+export default api;
