@@ -1,8 +1,9 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 
 import './SearchPanel.css';
-import { searchIconUrl, closeIconUrl } from '../../assets/icons/index.js';
+import { searchIconUrl, closeIconUrl, infoIconUrl } from '../../assets/icons/index.js';
+import InfoModal from '../Info/InfoModal';
 
 
 /**
@@ -38,6 +39,7 @@ const SearchPanel = ({
   onTouchEnd,
 }) => {
   const suggestionClickedRef = useRef(false); // Ref to manage blur/click race condition for suggestions
+  const [showInfoModal, setShowInfoModal] = useState(false); // State to control info modal visibility
 
 
   // --- Event Handlers ---
@@ -59,6 +61,10 @@ const SearchPanel = ({
   const handleToggleTowersButton = () => {
     // console.log("[SearchPanel] Toggling cell towers. Current showCellTowers:", showCellTowers); // Debug log
     onToggleCellTowers(); // Call parent handler to toggle tower visibility
+  };
+
+  const handleToggleInfoModal = () => {
+    setShowInfoModal(!showInfoModal); // Toggle the info modal visibility
   };
 
 
@@ -91,7 +97,14 @@ const SearchPanel = ({
             {/* --- Panel Header --- */}
             <div className="search-panel-header">
               <span>Where to?</span> {/* Panel Title */}
-              {/* Optional: Add other header elements if needed */}
+              <button 
+                className="info-button" 
+                onClick={handleToggleInfoModal} 
+                aria-label="Help information" 
+                title="Learn how to use CellWay"
+              >
+                <img src={infoIconUrl} alt="Info" className="icon-img small" />
+              </button>
             </div>
 
 
@@ -198,6 +211,9 @@ const SearchPanel = ({
           </div> {/* End .search-panel-content */}
         </div>
       )}
+
+      {/* --- Info Modal (Conditionally Rendered) --- */}
+      {showInfoModal && <InfoModal onClose={() => setShowInfoModal(false)} />}
     </>
   );
 };
