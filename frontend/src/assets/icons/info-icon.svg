@@ -1,13 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<<<<<<< HEAD
 <svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" fill="none">
     <circle cx="32" cy="32" r="28" stroke="currentColor" stroke-width="4"/>
     <rect x="30" y="28" width="4" height="20" fill="currentColor"/>
     <circle cx="32" cy="18" r="4" fill="currentColor"/>
-=======
-<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none">
-    <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
-    <rect x="11" y="10" width="2" height="6" fill="currentColor"/>
-    <rect x="11" y="7" width="2" height="2" fill="currentColor"/>
->>>>>>> 32b0b56b4f967e8f36932f5b7783f603e01ac663
 </svg>
