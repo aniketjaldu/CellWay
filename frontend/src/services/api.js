@@ -12,7 +12,7 @@ import { toast } from 'react-hot-toast'; // Library for displaying notifications
 // Creates a pre-configured instance of Axios for all API calls.
 const api = axios.create({
   // Base URL for all API requests. Reads from environment variable or uses a default.
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api',
+  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api',
   // Send cookies with requests (essential for session-based authentication).
   withCredentials: true,
   // Set a global timeout for requests (e.g., 30 seconds).

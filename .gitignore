@@ -6,8 +6,9 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
-node_modules/
-dist/
+
+node_modules
+dist
 dist-ssr
 *.local
 
@@ -23,15 +24,10 @@ dist-ssr
 *.sw?
 *.py[cod]
 
-
 #Byte-compiled / optimized / DLL files
-backend/__pycache__
+backend/_pycache_
 backend/cache
-backend/models/__pycache__
-backend/routes/__pycache__
-backend/services/__pycache__
-backend/utils/__pycache__
-
 
 # Ignore environment files
 .env
+# DO NOT CHANGE (.env) - it pertains to an environment needed to protect credentials from public/online risk by ensure it is never pushed to GitHub

@@ -23,11 +23,4 @@ class Config:
     MAIL_DEFAULT_SENDER = os.environ.get('MAIL_DEFAULT_SENDER')
     # Optional: Suppress sending emails for testing
     # MAIL_SUPPRESS_SEND = os.environ.get('MAIL_SUPPRESS_SEND', 'false').lower() in ['true', '1', 't']
-
-    # --- CORS Configuration ---
-    CORS_ALLOWED_ORIGINS = {
-        'https://cellway.tech',
-        'https://www.cellway.tech',
-        'http://localhost:5173',
-    }
     
