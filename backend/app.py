@@ -117,6 +117,20 @@ def create_app(config_class=Config) -> Flask:
         log.info("API ping endpoint '/api/ping' was accessed.")
         return jsonify({"message": "pong"})
 
+    # --- Define Debug CORS Endpoint ---
+    @app.route("/api/debug/cors", methods=["GET"])
+    def debug_cors():
+        """Endpoint to test CORS configuration"""
+        return jsonify({
+            "message": "CORS is working!",
+            "allowed_origins": [
+                "http://localhost:5173",
+                "http://127.0.0.1:5173",
+                "https://cellway.tech",
+                "https://www.cellway.tech"
+            ]
+        })
+
     # --- Define Root Endpoint (Health Check) ---
     @app.route("/")  # Define a basic root endpoint for health check
     def index():
