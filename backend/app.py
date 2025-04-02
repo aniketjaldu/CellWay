@@ -14,6 +14,7 @@ from flask_cors import CORS
 from flask_mail import Mail
 
 from config import Config  # Absolute import for configuration
+from utils.middleware import cors_middleware
 
 # --- Logging Configuration ---
 logging.basicConfig(
@@ -76,14 +77,24 @@ def create_app(config_class=Config) -> Flask:
     log.info("Flask-Mail extension initialized.")
 
     # --- Configure CORS (Cross-Origin Resource Sharing) ---
-    frontend_origins = ["http://localhost:5173", "http://127.0.0.1:5173", 
-                        "https://cellway.tech", "https://www.cellway.tech"]
-    
+    frontend_origins = [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173", 
+        "https://cellway.tech",
+        "https://www.cellway.tech"
+    ]
+
     CORS(
         app,
-        resources={r"/api/*": {"origins": frontend_origins, "supports_credentials": True}},
+        resources={r"/api/*": {"origins": "*", "supports_credentials": True}},
+        allow_headers=["Content-Type", "Authorization"],
+        expose_headers=["Content-Type", "Authorization"],
+        methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"]
     )
     log.info(f"CORS configured to allow requests from origins: {frontend_origins}")
+
+    # Apply CORS middleware
+    cors_middleware(app)
 
     # --- Register API Blueprints ---
     from routes.auth_routes import auth_bp  # Import authentication blueprint
