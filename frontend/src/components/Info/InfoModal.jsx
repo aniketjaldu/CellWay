@@ -110,4 +110,8 @@ InfoModal.propTypes = {
   onClose: PropTypes.func.isRequired, // Handler to close the modal
 };
 
+<<<<<<< HEAD
 export default InfoModal;
+=======
+export default InfoModal; 
+>>>>>>> 32b0b56b4f967e8f36932f5b7783f603e01ac663
