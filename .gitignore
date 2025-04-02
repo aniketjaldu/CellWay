@@ -25,7 +25,7 @@ dist-ssr
 
 
 #Byte-compiled / optimized / DLL files
-backend/_pycache_
+backend/__pycache__
 backend/cache
 backend/models/__pycache__
 backend/routes/__pycache__

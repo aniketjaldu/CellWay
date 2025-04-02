@@ -78,7 +78,8 @@ def create_app(config_class=Config) -> Flask:
     # --- Configure CORS (Cross-Origin Resource Sharing) ---
     # Allow CORS for development frontend origins; restrict origins in production for security.
     frontend_dev_origins = ["http://localhost:5173", "http://127.0.0.1:5173"]  # Development frontend origins
-    cors_origins = frontend_dev_origins  # Use development origins for now (TODO: make configurable for production)
+    frontend_prod_origins = ["https://cellway.tech", "https://www.cellway.tech"]  # Production frontend origins
+    cors_origins = frontend_prod_origins
 
     CORS(
         app,
