@@ -1,5 +1,6 @@
 {
     "version": 2,
+    "framework": "vite",
     "buildCommand": "cd frontend && npm install && npm run build",
     "outputDirectory": "frontend/dist",
     "installCommand": "cd frontend && npm install",
@@ -8,6 +9,7 @@
         { "src": "/(.*)", "dest": "/index.html" }
     ],
     "env": {
+        "VITE_MAPTILER_KEY": "HJwiHCOYExf37ECEomwa",
         "VITE_API_BASE_URL": "https://cellway-production.up.railway.app/api"
     }
 }
