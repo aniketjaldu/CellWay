@@ -1,5 +1,6 @@
-from flask import request, make_response
+from flask import request, make_response, jsonify
 import logging
+import traceback
 
 log = logging.getLogger(__name__)
 
@@ -36,3 +37,15 @@ def cors_middleware(app):
         return add_cors_headers(response)
     
     log.info("CORS middleware configured")
+
+def register_error_handlers(app):
+    @app.errorhandler(Exception)
+    def handle_exception(e):
+        log.error(f"Unhandled exception: {str(e)}")
+        log.error(traceback.format_exc())
+        return jsonify({
+            "error": "Internal server error",
+            "message": str(e),
+            "path": request.path,
+            "method": request.method
+        }), 500
