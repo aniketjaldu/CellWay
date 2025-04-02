@@ -1,0 +1,158 @@
+/**
+ * InfoModal Component Styles
+ */
+
+/* --- Modal Overlay (Full screen, semi-transparent background) --- */
+.info-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000; /* Ensure it's above other elements */
+  padding: 20px;
+}
+
+/* --- Modal Container --- */
+.info-modal-container {
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  max-width: 800px;
+  width: 90%;
+  max-height: 85vh;
+  overflow: hidden;
+  position: relative;
+  animation: modalFadeIn 0.3s ease-out forwards;
+}
+
+/* --- Modal Header --- */
+.info-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  background-color: #f0f4ff;
+  border-bottom: 1px solid #dde4f5;
+}
+
+.info-modal-header h2 {
+  margin: 0;
+  font-size: 1.4rem;
+  color: #2d3748;
+  font-weight: 600;
+}
+
+/* --- Close Button --- */
+.info-close-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s;
+}
+
+.info-close-button:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.info-close-button .icon-img.small {
+  width: 20px;
+  height: 20px;
+  color: #4a5568;
+}
+
+/* --- Modal Content --- */
+.info-modal-content {
+  padding: 20px;
+  overflow-y: auto;
+  max-height: calc(85vh - 70px); /* Adjust based on header height */
+}
+
+/* --- Info Sections --- */
+.info-section {
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #edf2f7;
+}
+
+.info-section:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.info-section h3 {
+  margin: 0 0 12px 0;
+  font-size: 1.2rem;
+  color: #3182ce;
+  font-weight: 600;
+}
+
+.info-section p {
+  margin: 0 0 12px 0;
+  line-height: 1.6;
+  color: #4a5568;
+}
+
+.info-section ul, 
+.info-section ol {
+  margin: 8px 0;
+  padding-left: 24px;
+}
+
+.info-section li {
+  margin-bottom: 8px;
+  line-height: 1.5;
+}
+
+.info-section strong {
+  font-weight: 600;
+  color: #2d3748;
+}
+
+/* --- Animation --- */
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* --- Responsive Adjustments --- */
+@media (max-width: 768px) {
+  .info-modal-container {
+    width: 95%;
+    max-height: 90vh;
+  }
+  
+  .info-modal-content {
+    padding: 16px;
+  }
+  
+  .info-section h3 {
+    font-size: 1.1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .info-modal-header h2 {
+    font-size: 1.2rem;
+  }
+  
+  .info-section {
+    margin-bottom: 20px;
+  }
+} 
