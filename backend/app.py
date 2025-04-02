@@ -5,16 +5,15 @@ This script sets up the Flask application, configures CORS, initializes Flask-Ma
 registers API blueprints for different functionalities (authentication, geocoding, routing, tower data),
 configures logging, and defines a basic health check endpoint.
 """
+from flask import Flask, jsonify, request
 import logging
 import os
 import secrets
 
-from flask import Flask, jsonify
 from flask_cors import CORS
 from flask_mail import Mail
 
 from config import Config  # Absolute import for configuration
-from utils.middleware import cors_middleware
 
 # --- Logging Configuration ---
 logging.basicConfig(
@@ -84,17 +83,46 @@ def create_app(config_class=Config) -> Flask:
         "https://www.cellway.tech"
     ]
 
+    # CORS should be applied before registering blueprints
     CORS(
         app,
-        resources={r"/api/*": {"origins": "*", "supports_credentials": True}},
+        origins=frontend_origins,
+        supports_credentials=True,
         allow_headers=["Content-Type", "Authorization"],
         expose_headers=["Content-Type", "Authorization"],
         methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"]
     )
     log.info(f"CORS configured to allow requests from origins: {frontend_origins}")
 
-    # Apply CORS middleware
-    cors_middleware(app)
+    # Add a more direct CORS handler for all responses
+    @app.after_request
+    def add_cors_headers(response):
+        origin = request.headers.get('Origin')
+        if origin in frontend_origins:
+            response.headers.set('Access-Control-Allow-Origin', origin)
+        else:
+            # For development and testing
+            response.headers.set('Access-Control-Allow-Origin', '*')
+        
+        response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
+        response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+        response.headers.set('Access-Control-Allow-Credentials', 'true')
+        return response
+
+    # Add inside create_app function, before registering blueprints
+    @app.route('/api/<path:path>', methods=['OPTIONS'])
+    def handle_preflight(path):
+        response = app.make_default_options_response()
+        origin = request.headers.get('Origin')
+        if origin in frontend_origins:
+            response.headers.set('Access-Control-Allow-Origin', origin)
+        else:
+            response.headers.set('Access-Control-Allow-Origin', '*')
+        
+        response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
+        response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+        response.headers.set('Access-Control-Allow-Credentials', 'true')
+        return response
 
     # --- Register API Blueprints ---
     from routes.auth_routes import auth_bp  # Import authentication blueprint
@@ -129,6 +157,18 @@ def create_app(config_class=Config) -> Flask:
                 "https://cellway.tech",
                 "https://www.cellway.tech"
             ]
+        })
+
+    # --- Define Proxy Endpoint ---
+    @app.route("/api/proxy/<path:path>", methods=["GET", "POST", "PUT", "DELETE"])
+    def proxy_endpoint(path):
+        """Proxy endpoint that simply returns data with proper CORS headers for testing"""
+        return jsonify({
+            "message": "Successfully proxied request",
+            "requested_path": path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "data": request.get_json(silent=True)
         })
 
     # --- Define Root Endpoint (Health Check) ---
