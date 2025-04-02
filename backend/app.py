@@ -123,5 +123,5 @@ if __name__ == "__main__":
     app = create_app()  # Create Flask application instance
     # --- Start Flask Development Server ---
     log.info("Starting Flask development server...")
-    app.run(debug=True, host="0.0.0.0", port=5001)  # Run Flask app in debug mode on all interfaces (for container access)
+    app.run(debug=True, host="0.0.0.0", port=8080)  # Run Flask app in debug mode on all interfaces (for container access)
     # --- NOTE: Use production-ready WSGI server (e.g., gunicorn, waitress) for production deployments. ---
