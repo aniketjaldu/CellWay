@@ -76,15 +76,14 @@ def create_app(config_class=Config) -> Flask:
     log.info("Flask-Mail extension initialized.")
 
     # --- Configure CORS (Cross-Origin Resource Sharing) ---
-    # Allow CORS for development frontend origins; restrict origins in production for security.
-    frontend_dev_origins = ["http://localhost:5173", "http://127.0.0.1:5173"]  # Development frontend origins
-    cors_origins = frontend_dev_origins  # Use development origins for now (TODO: make configurable for production)
-
+    frontend_origins = ["http://localhost:5173", "http://127.0.0.1:5173", 
+                        "https://cellway.tech", "https://www.cellway.tech"]
+    
     CORS(
         app,
-        resources={r"/api/*": {"origins": cors_origins, "supports_credentials": True}},  # Configure CORS for /api/* routes
+        resources={r"/api/*": {"origins": frontend_origins, "supports_credentials": True}},
     )
-    log.info(f"CORS configured to allow requests from origins: {cors_origins}")
+    log.info(f"CORS configured to allow requests from origins: {frontend_origins}")
 
     # --- Register API Blueprints ---
     from routes.auth_routes import auth_bp  # Import authentication blueprint
