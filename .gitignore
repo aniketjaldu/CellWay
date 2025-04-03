@@ -34,4 +34,6 @@ backend/utils/__pycache__
 
 # Ignore environment files
 .env
+.env.local
+.env.production
 # DO NOT CHANGE (.env) - it pertains to an environment needed to protect credentials from public/online risk by ensure it is never pushed to GitHub
