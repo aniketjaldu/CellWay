@@ -39,20 +39,23 @@
      ================================================== */
   
   /* Custom styling for attribution control to ensure consistency */
-  .map-container .leaflet-control-attribution {
-    background: rgba(255, 255, 255, 0.8);
-    color: #333;
-    font-size: 11px;
-    line-height: 1.4;
-    padding: 0 5px;
-    margin: 0;
+  .map-container .leaflet-control-attribution,
+  html body .leaflet-container .leaflet-control-attribution {
+    background: rgba(255, 255, 255, 0.8) !important;
+    color: #333 !important;
+    font-size: 11px !important;
+    line-height: 1.4 !important;
+    padding: 0 5px !important;
+    margin: 0 !important;
   }
   
-  .map-container .leaflet-control-attribution a {
-    color: #0078A8;
-    text-decoration: none;
+  .map-container .leaflet-control-attribution a,
+  html body .leaflet-container .leaflet-control-attribution a {
+    color: #0078A8 !important;
+    text-decoration: none !important;
   }
   
-  .map-container .leaflet-control-attribution a:hover {
-    text-decoration: underline;
+  .map-container .leaflet-control-attribution a:hover,
+  html body .leaflet-container .leaflet-control-attribution a:hover {
+    text-decoration: underline !important;
   }
