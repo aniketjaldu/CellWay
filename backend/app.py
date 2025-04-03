@@ -79,7 +79,7 @@ def create_app(config_class=Config) -> Flask:
     frontend_origins = ["http://localhost:5173", "http://127.0.0.1:5173",
                         "https://cell-way.vercel.app", "cell-way.vercel.app", "http://cell-way.vercel.app", 
                         "https://cellway.tech", "www.cellway.tech", "http://cellway.tech",
-                        "https://giving-equal-bluegill.ngrok-free.app"]
+                        "https://cellway-backend.ngrok.app"]
     
     CORS(
         app,
