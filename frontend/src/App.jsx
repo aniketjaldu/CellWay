@@ -651,24 +651,30 @@ function App() {
       />}
 
       {/* --- Directions Panel --- */}
-      <DirectionsPanel
-        isVisible={showDirectionsPanel}
-        isMinimized={isDirectionsMinimized}
-        directions={routeDirections}
-        originName={routeOriginDisplay}
-        destinationName={routeDestinationDisplay}
-        activeStepIndex={activeDirectionStep}
-        onStepClick={handleStepClick}
-        onToggleMinimize={toggleDirectionsMinimized}
-        onClose={clearRoutingState} // Close button clears the current route
-        onSave={handleSaveRouteClick} // Pass wrapped save handler
-        canSave={!!user} // Enable save only if user is logged in
-        // Map interaction prevention
-        onMouseEnter={handleOverlayEnter}
-        onMouseLeave={handleOverlayLeave}
-        onTouchStart={handleOverlayEnter}
-        onTouchEnd={handleOverlayLeave}
-      />
+      {showDirectionsPanel && (
+        <DirectionsPanel
+          isVisible={showDirectionsPanel}
+          isMinimized={isDirectionsMinimized}
+          routeInfo={routeInfo}
+          activeStep={activeDirectionStep}
+          onStepClick={handleStepClick}
+          onBackClick={clearRoutingState}
+          onMinimizeToggle={toggleDirectionsMinimized}
+          origin={routeOriginDisplay}
+          destination={routeDestinationDisplay}
+          routeType={routeType}
+          routingProvider={computedRoutes?.[routeType]?.routing_provider || 'graphhopper'}
+          onToggleMinimize={toggleDirectionsMinimized}
+          onClose={clearRoutingState}
+          canSave={!!user}
+          onSave={user ? saveCurrentRoute : null}
+          // Map interaction prevention
+          onMouseEnter={handleOverlayEnter}
+          onMouseLeave={handleOverlayLeave}
+          onTouchStart={handleOverlayEnter}
+          onTouchEnd={handleOverlayLeave}
+        />
+      )}
 
 
       {/* --- Modals --- */}

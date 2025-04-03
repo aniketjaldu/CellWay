@@ -1,5 +1,6 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
+import { convertMetersToMiles, formatDuration } from '../../utils/formatting'; // Utility functions for formatting route data
 
 import './DirectionsPanel.css';
 import { getDirectionIcon } from '../../utils/formatting';
@@ -9,17 +10,20 @@ import { closeIconUrl } from '../../assets/icons/index.js';
 /**
  * DirectionsPanel Component
  * 
- * Displays route directions in a panel, including summary, step-by-step instructions,
- * and actions like save and minimize.
+ * Displays route directions, steps, and related information for the selected route.
  */
-const DirectionsPanel = ({
-  isVisible,
+const DirectionsPanel = ({ 
+  isVisible, 
   isMinimized,
-  directions,
-  originName,
-  destinationName,
-  activeStepIndex,
+  routeInfo,
+  activeStep, 
   onStepClick,
+  onBackClick,
+  onMinimizeToggle,
+  origin,
+  destination,
+  routeType,
+  routingProvider, // Add routing provider parameter
   onToggleMinimize,
   onClose,
   onSave,
@@ -29,185 +33,186 @@ const DirectionsPanel = ({
   onTouchStart,
   onTouchEnd,
 }) => {
-  const contentRef = useRef(null);  // Ref for the scrollable content area
-  const activeItemRef = useRef(null); // Ref for the active instruction item
+  const panelRef = useRef(null); // Ref for the panel element for scrolling functionality
+  const [headerHeight, setHeaderHeight] = useState(0); // State to track the height of the panel header
 
-
-  // --- Scroll to Active Step Effect ---
+  // --- Auto-scroll when active step changes ---
   useEffect(() => {
-    if (activeItemRef.current && contentRef.current) {
-      contentRef.current.scrollTo({
-        top: activeItemRef.current.offsetTop - contentRef.current.offsetTop - 10, // Adjust scroll offset
-        behavior: 'smooth', // Smooth scrolling behavior
-      });
+    if (panelRef.current && activeStep !== null && activeStep >= 0) {
+      const stepElement = document.querySelector(`.direction-step[data-step="${activeStep}"]`);
+      if (stepElement) {
+        const scrollContainer = panelRef.current.querySelector('.directions-panel-body');
+        if (scrollContainer) {
+          const stepTop = stepElement.offsetTop;
+          const containerScrollTop = scrollContainer.scrollTop;
+          const containerHeight = scrollContainer.clientHeight;
+          
+          // Scroll if step is not fully visible in the container
+          if (stepTop < containerScrollTop || stepTop > containerScrollTop + containerHeight - 100) {
+            // Scroll the element into view with some padding
+            scrollContainer.scrollTo({
+              top: stepTop - 20, // 20px padding from top
+              behavior: 'smooth'
+            });
+          }
+        }
+      }
     }
-  }, [activeStepIndex]);
+  }, [activeStep]);
 
-
-  // --- Prevent Map Scroll/Click Propagation Effect ---
+  // --- Measure header height for CSS calculations ---
   useEffect(() => {
-    const contentElement = contentRef.current;
-    if (contentElement && !isMinimized && window.L?.DomEvent) {
-      L.DomEvent.disableScrollPropagation(contentElement);  // Disable scroll propagation to map
-      L.DomEvent.disableClickPropagation(contentElement);  // Disable click propagation to map
+    if (panelRef.current) {
+      const headerElement = panelRef.current.querySelector('.directions-panel-header');
+      if (headerElement) {
+        setHeaderHeight(headerElement.offsetHeight);
+      }
     }
-    // Cleanup (though might not be strictly necessary as Leaflet might handle it)
-  }, [contentRef, isMinimized]);
+  }, [isVisible]); // Re-measure when visibility changes
 
-
-
-  // --- Conditional Rendering: Panel Visibility ---
+  // --- Panel should not render if not visible ---
   if (!isVisible) {
-    return null; // Do not render the panel if it's not visible
+    return null;
   }
 
+  // --- Extract route information ---
+  const distance = routeInfo?.distance || 0;
+  const duration = routeInfo?.duration || 0;
+  const steps = routeInfo?.steps || [];
+  const route_summary = routeInfo?.summary || '';
 
-  // --- Minimized Panel View ---
+  // --- Format route information for display ---
+  const distanceMiles = convertMetersToMiles(distance);
+  const durationFormatted = formatDuration(duration);
+
+  // --- Return minimized view if minimized ---
   if (isMinimized) {
     return (
-      <div
-        className="directions-panel-container minimized"
-        onClick={onToggleMinimize}       // Expand panel on click
-        onMouseEnter={onMouseEnter}       // Prevent map interactions when panel hovered
-        onMouseLeave={onMouseLeave}
-        onTouchStart={onTouchStart}       // Prevent map interactions on touch
-        onTouchEnd={onTouchEnd}
-        title="Expand Directions"         // Accessibility title
-        role="button"                    // Semantic role for accessibility
-        aria-label="Expand Directions"   // ARIA label for accessibility
-      >
-        <div className="directions-panel-header">
-          <div className="directions-toggle-icon">🗺️</div> {/* Map emoji icon to expand */}
+      <div className="directions-panel-minimized">
+        <div className="directions-minimized-content">
+          <div className="directions-minimized-summary">
+            <span className="directions-minimized-distance">{distanceMiles}</span>
+            <span className="directions-minimized-duration">{durationFormatted}</span>
+          </div>
+          <button className="directions-panel-expand-button" onClick={onMinimizeToggle} aria-label="Expand directions panel">
+            ▲ {/* Up arrow */}
+          </button>
         </div>
       </div>
     );
   }
 
+  // --- Get route type display string ---
+  const getRouteTypeDisplay = (type) => {
+    switch (type) {
+      case 'fastest': return 'Fastest Route';
+      case 'cell_coverage': return 'Best Cell Coverage';
+      case 'balanced': return 'Balanced (Speed & Coverage)';
+      default: return type ? type.charAt(0).toUpperCase() + type.slice(1) : 'Route';
+    }
+  };
 
-  // --- Full Panel View ---
+  // --- Get routing provider display string ---
+  const getRoutingProviderDisplay = (provider) => {
+    switch (provider) {
+      case 'graphhopper': return 'GraphHopper';
+      case 'osrm': return 'OSRM';
+      default: return provider ? provider.charAt(0).toUpperCase() + provider.slice(1) : 'Unknown';
+    }
+  };
+
+  // --- Return full panel view ---
   return (
-    <div
-      className="directions-panel-container"
-      onMouseEnter={onMouseEnter}       // Prevent map interactions when panel hovered
-      onMouseLeave={onMouseLeave}
-      onTouchStart={onTouchStart}       // Prevent map interactions on touch
-      onTouchEnd={onTouchEnd}
-    >
-      {/* --- Header Section --- */}
+    <div className="directions-panel-container" ref={panelRef}>
       <div className="directions-panel-header">
-        <div className="directions-title">
-          <div className="direction-endpoints">
-            <span className="direction-origin">{originName || 'Origin'}</span>      {/* Origin Name */}
-            <span className="direction-separator">→</span>                         {/* Separator Arrow */}
-            <span className="direction-destination">{destinationName || 'Destination'}</span> {/* Destination Name */}
-          </div>
-        </div>
-
-        {/* --- Header Actions --- */}
-        <div className="directions-actions">
-          {canSave && onSave && ( // Conditionally render Save button if save functionality is enabled
-            <button
-              className="directions-action-button save-button"
-              onClick={onSave}              // Save route on click
-              title="Save Route"              // Accessibility title
-              aria-label="Save Route"         // ARIA label for accessibility
-            >
-              💾 {/* Floppy disk emoji for save */}
-            </button>
+        <button className="directions-panel-back-button" onClick={onBackClick} aria-label="Close directions">
+          ← {/* Left arrow */}
+        </button>
+        <div className="directions-panel-title">
+          <h2>Directions</h2>
+          <div className="directions-route-type">{getRouteTypeDisplay(routeType)}</div>
+          {routingProvider && (
+            <div className="directions-routing-provider">via {getRoutingProviderDisplay(routingProvider)}</div>
           )}
-          <button
-            className="directions-action-button minimize-button"
-            onClick={onToggleMinimize}       // Minimize panel on click
-            title="Minimize Directions"       // Accessibility title
-            aria-label="Minimize Directions"  // ARIA label for accessibility
-          >
-            × {/* Multiplication X character for minimize/close */}
-          </button>
+        </div>
+        <button className="directions-panel-minimize-button" onClick={onMinimizeToggle} aria-label="Minimize directions panel">
+          ▼ {/* Down arrow */}
+        </button>
+      </div>
+
+      <div className="directions-panel-summary">
+        <div className="directions-stats">
+          <div className="directions-distance">{distanceMiles}</div>
+          <div className="directions-duration">{durationFormatted}</div>
+        </div>
+        <div className="directions-route-summary">{route_summary}</div>
+        <div className="directions-endpoints">
+          <div className="directions-origin">{origin}</div>
+          <div className="directions-destination">{destination}</div>
         </div>
       </div>
 
-
-      {/* --- Content Section (Summary and Instructions) --- */}
-      <div className="directions-panel-content" ref={contentRef}>
-
-        {/* --- Route Summary --- */}
-        {directions && ( // Conditionally render summary if directions data is available
-          <div className="directions-summary">
-            <div><strong>Dist:</strong> {directions.distanceFormatted}</div>    {/* Formatted distance */}
-            <div><strong>Time:</strong> {directions.durationFormatted}</div>    {/* Formatted duration */}
-            {directions.ascendFormatted && <div><strong>Asc:</strong> {directions.ascendFormatted}</div>}   {/* Formatted ascent */}
-            {directions.descendFormatted && <div><strong>Desc:</strong> {directions.descendFormatted}</div>} {/* Formatted descent */}
-          </div>
-        )}
-
-
-        {/* --- Instruction List Container --- */}
-        <div className="instruction-list-container">
-          <ul className="instruction-list">
-            {(directions?.steps && directions.steps.length > 0) ? ( // Render steps if available
-              directions.steps.map((step, index) => (
-                <li
-                  key={index}
-                  ref={activeStepIndex === index ? activeItemRef : null} // Attach ref to active item for scrolling
-                  className={`instruction-item ${activeStepIndex === index ? 'active' : ''}`} // Apply 'active' class to active step
-                  onClick={(e) => { e.stopPropagation(); onStepClick(step, index); }} // Handle step click, stop map event
-                  role="button"                  // Semantic role for accessibility
-                  tabIndex={0}                   // Make focusable for keyboard navigation
-                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onStepClick(step, index); }} // Keyboard accessibility
-                >
-                  <div className={`instruction-icon icon-${step.type?.toLowerCase() || 'default'}`}> {/* Icon container */}
-                    {getDirectionIcon(step.type) || '•'} {/* Direction icon or default bullet */}
+      <div className="directions-panel-body" style={{ maxHeight: `calc(80vh - ${headerHeight}px)` }}>
+        <div className="directions-steps">
+          {steps.map((step, index) => (
+            <div 
+              key={index}
+              className={`direction-step ${activeStep === index ? 'active' : ''}`}
+              data-step={index}
+              onClick={() => onStepClick(index)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  onStepClick(index);
+                }
+              }}
+            >
+              <div className="direction-step-icon">
+                {index === 0 ? (
+                  <div className="direction-start-icon">●</div>
+                ) : index === steps.length - 1 ? (
+                  <div className="direction-end-icon">◆</div>
+                ) : (
+                  <div className="direction-icon">{index}</div>
+                )}
+              </div>
+              <div className="direction-step-content">
+                <div className="direction-instruction">{step.instruction}</div>
+                {step.distance > 0 && (
+                  <div className="direction-distance-small">
+                    {convertMetersToMiles(step.distance)}
                   </div>
-                  <div className="instruction-text">
-                    <div className="instruction-direction">{step.instruction}</div>           {/* Instruction text */}
-                    {step.distanceFormatted && <div className="instruction-distance">{step.distanceFormatted}</div>} {/* Formatted distance for step */}
-                  </div>
-                </li>
-              ))
-            ) : (
-              // --- No Directions Message ---
-              <li className="instruction-item no-directions">
-                <div className="instruction-text">No detailed directions available.</div> {/* Message when no directions */}
-              </li>
-            )}
-          </ul>
+                )}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </div>
   );
 };
 
-
 DirectionsPanel.propTypes = {
-  isVisible: PropTypes.bool.isRequired,         // Is the panel visible? (boolean)
-  isMinimized: PropTypes.bool.isRequired,       // Is the panel minimized? (boolean)
-  directions: PropTypes.shape({                 // Directions data object
-    distanceFormatted: PropTypes.string,
-    durationFormatted: PropTypes.string,
-    ascendFormatted: PropTypes.string,
-    descendFormatted: PropTypes.string,
-    steps: PropTypes.arrayOf(PropTypes.shape({ // Array of steps
-      type: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-      instruction: PropTypes.string,
-      distanceFormatted: PropTypes.string,
-      coordinates: PropTypes.array,
-      streetName: PropTypes.string,
-      segmentCoordinates: PropTypes.array,
-    })),
-  }),
-  originName: PropTypes.string,                // Name of the origin location (string)
-  destinationName: PropTypes.string,           // Name of the destination location (string)
-  activeStepIndex: PropTypes.number,           // Index of the active step (number)
-  onStepClick: PropTypes.func.isRequired,      // Handler for step click (function)
-  onToggleMinimize: PropTypes.func.isRequired, // Handler to toggle minimize panel (function)
-  onClose: PropTypes.func.isRequired,         // Handler for panel close (function)
-  onSave: PropTypes.func,                    // Handler for save route action (function, optional)
-  canSave: PropTypes.bool,                   // Can route be saved (boolean, optional)
-  onMouseEnter: PropTypes.func,              // Handler for mouse enter (function, optional)
-  onMouseLeave: PropTypes.func,             // Handler for mouse leave (function, optional)
-  onTouchStart: PropTypes.func,              // Handler for touch start (function, optional)
-  onTouchEnd: PropTypes.func,                // Handler for touch end (function, optional)
+  isVisible: PropTypes.bool.isRequired,            // Whether the panel should be visible
+  isMinimized: PropTypes.bool.isRequired,          // Whether the panel is minimized
+  routeInfo: PropTypes.object,                     // Route information object with distance, duration, steps
+  activeStep: PropTypes.number,                    // Index of currently active step (-1 or null if none)
+  onStepClick: PropTypes.func.isRequired,          // Handler for when a step is clicked
+  onBackClick: PropTypes.func.isRequired,          // Handler for when back button is clicked
+  onMinimizeToggle: PropTypes.func.isRequired,     // Handler for when minimize button is clicked
+  origin: PropTypes.string,                        // Origin location display name
+  destination: PropTypes.string,                   // Destination location display name
+  routeType: PropTypes.string,                     // Type of route ('fastest', 'cell_coverage', 'balanced')
+  routingProvider: PropTypes.string,               // Routing provider used ('graphhopper', 'osrm')
+  onToggleMinimize: PropTypes.func.isRequired,     // Handler to toggle minimize panel (function)
+  onClose: PropTypes.func.isRequired,              // Handler for panel close (function)
+  onSave: PropTypes.func,                          // Handler for save route action (function, optional)
+  canSave: PropTypes.bool,                         // Can route be saved (boolean, optional)
+  onMouseEnter: PropTypes.func,                    // Handler for mouse enter (function, optional)
+  onMouseLeave: PropTypes.func,                     // Handler for mouse leave (function, optional)
+  onTouchStart: PropTypes.func,                      // Handler for touch start (function, optional)
+  onTouchEnd: PropTypes.func,                        // Handler for touch end (function, optional)
 };
-
 
 export default DirectionsPanel;

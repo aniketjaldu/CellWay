@@ -1,10 +1,11 @@
 """
 Service functions for route calculation, optimization, and cell coverage analysis.
-Utilizes external routing APIs (e.g., GraphHopper) and cell tower data to provide
+Utilizes external routing APIs (e.g., GraphHopper, OSRM) and cell tower data to provide
 optimized routes based on speed, cell coverage, or a balance of both.
 """
 import logging
 import random
+from math import radians, cos, sin, asin, sqrt
 
 import requests
 
@@ -17,9 +18,31 @@ log = logging.getLogger(__name__)
 # --- Constants ---
 DEFAULT_ALTERNATIVES = 5  # Default number of route alternatives to request from GraphHopper
 MAX_ALTERNATIVES = 10  # Maximum number of route alternatives allowed
-GRAPHOPPER_TIMEOUT = 20  # Timeout in seconds for GraphHopper API requests
+GRAPHOPPER_TIMEOUT = 120  # Timeout in seconds for GraphHopper API requests
+OSRM_TIMEOUT = 60  # Timeout in seconds for OSRM API requests
 TOWER_SEARCH_BUFFER = 0.1  # Buffer in degrees around route points for cell tower search area
 TOWER_PROXIMITY_METERS = 2500  # Maximum distance in meters for a tower to be considered "along" the route
+# Estimated "long route" threshold in km - routes longer than this will be checked for potential fallback
+LONG_ROUTE_THRESHOLD_KM = 400  # GraphHopper free tier is typically limited to ~500km
+
+
+# --- Utility Functions ---
+def _haversine_distance(lat1, lon1, lat2, lon2):
+    """
+    Calculate the great circle distance between two points on the earth (in kilometers).
+    Uses the Haversine formula.
+    """
+    # Convert decimal degrees to radians
+    lon1, lat1, lon2, lat2 = map(radians, [lon1, lat1, lon2, lat2])
+
+    # Haversine formula
+    dlon = lon2 - lon1
+    dlat = lat2 - lat1
+    a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
+    c = 2 * asin(sqrt(a))
+    # Radius of earth in kilometers is 6371
+    km = 6371 * c
+    return km
 
 
 # --- Private Helper Functions ---
@@ -53,6 +76,7 @@ def _parse_graphhopper_path(path_data: dict, profile: str = "car") -> dict | Non
         "ascend": path_data.get("ascend", 0),  # Total ascent in meters along the route
         "descend": path_data.get("descend", 0),  # Total descent in meters along the route
         "profile_used": profile,  # Routing profile used for this route (e.g., 'car')
+        "routing_provider": "graphhopper",  # Indicate which routing service provided this route
         # Add other relevant top-level route information here if needed
     }
 
@@ -93,6 +117,62 @@ def _parse_graphhopper_path(path_data: dict, profile: str = "car") -> dict | Non
     return route
 
 
+def _parse_osrm_route(route_data: dict, profile: str = "car") -> dict | None:
+    """
+    Parses a route from an OSRM API response into a standardized route dictionary format.
+
+    Args:
+        route_data (dict): A route object from the OSRM JSON response.
+        profile (str, optional): The routing profile used (e.g., 'car', 'bike', 'foot'). Defaults to 'car'.
+
+    Returns:
+        dict | None: A standardized route dictionary if parsing is successful, None otherwise.
+                     The dictionary includes route geometry, legs with steps/instructions, distance, duration, and other relevant details.
+    """
+    if "geometry" not in route_data or "legs" not in route_data:
+        log.warning("OSRM route data is missing required geometry or legs data.")
+        return None
+
+    # Extract coordinates from OSRM GeoJSON format
+    coordinates = []
+    if "coordinates" in route_data["geometry"]:
+        coordinates = route_data["geometry"]["coordinates"]
+    else:
+        log.warning("OSRM geometry is missing coordinates. Cannot parse route.")
+        return None
+
+    route = {
+        "geometry": {"coordinates": coordinates, "type": "LineString"},  # GeoJSON LineString geometry
+        "legs": [],  # Will contain route legs
+        "distance": route_data.get("distance", 0),  # Total route distance in meters
+        "duration": route_data.get("duration", 0),  # Total route duration in seconds
+        "weight": route_data.get("weight", 0),  # Route weight (OSRM's internal optimization metric)
+        "weight_name": route_data.get("weight_name", "duration"),  # Name of the weight metric
+        "routing_provider": "osrm",  # Indicate which routing service provided this route
+        "profile_used": profile,  # Routing profile used for this route
+    }
+
+    # Process legs data
+    for leg_data in route_data.get("legs", []):
+        leg = {"steps": []}
+        
+        # Process steps
+        for step_data in leg_data.get("steps", []):
+            step = {
+                "name": step_data.get("name", ""),
+                "distance": step_data.get("distance", 0),
+                "duration": step_data.get("duration", 0),
+                "geometry": step_data.get("geometry", {"coordinates": [], "type": "LineString"}),
+                "maneuver": step_data.get("maneuver", {}),
+                "instruction_text": step_data.get("maneuver", {}).get("instruction", ""),
+            }
+            leg["steps"].append(step)
+        
+        route["legs"].append(leg)
+
+    return route
+
+
 def _calculate_graphhopper_routes(
     start_lat: float, start_lng: float, end_lat: float, end_lng: float, alternatives: int = DEFAULT_ALTERNATIVES
 ) -> dict:
@@ -121,6 +201,11 @@ def _calculate_graphhopper_routes(
     if not Config.GRAPHHOPPER_KEY:
         log.error("GraphHopper API key is not configured. Route calculation cannot proceed.")
         return {"code": "Error", "message": "Routing service configuration error: API key missing."}
+
+    # Check if this is potentially a long route that might exceed GraphHopper limits
+    route_distance_km = _haversine_distance(start_lat, start_lng, end_lat, end_lng)
+    if route_distance_km > LONG_ROUTE_THRESHOLD_KM:
+        log.warning(f"Long route detected ({route_distance_km:.1f} km). GraphHopper may have difficulty with routes over {LONG_ROUTE_THRESHOLD_KM} km.")
 
     try:
         url = "https://graphhopper.com/api/1/route"
@@ -186,7 +271,7 @@ def _calculate_graphhopper_routes(
 
     except requests.exceptions.Timeout:
         log.error("GraphHopper API request timed out after %s seconds.", GRAPHOPPER_TIMEOUT)
-        return {"code": "Error", "message": "Routing service request timed out."}
+        return {"code": "Timeout", "message": "Routing service request timed out."}
 
     except requests.exceptions.RequestException as e:
         status_code = e.response.status_code if e.response else None
@@ -206,6 +291,209 @@ def _calculate_graphhopper_routes(
     except Exception as e:
         log.exception("Unexpected error during GraphHopper route calculation: %s", e)
         return {"code": "Error", "message": "An unexpected error occurred during route calculation."}
+
+
+def _calculate_osrm_route(
+    start_lat: float, start_lng: float, end_lat: float, end_lng: float
+) -> dict:
+    """
+    Calculate a route using the OSRM API as a fallback when GraphHopper fails.
+    
+    Args:
+        start_lat (float): Latitude of the starting point.
+        start_lng (float): Longitude of the starting point.
+        end_lat (float): Latitude of the destination point.
+        end_lng (float): Longitude of the destination point.
+    
+    Returns:
+        dict: A dictionary containing routing information.
+              On success, includes 'code': 'Ok', 'routes' (list of parsed route dictionaries), and 'waypoints'.
+              On failure, includes 'code': 'Error' and 'message' with error details.
+    """
+    log.info(
+        f"Using OSRM fallback routing service from ({start_lat:.6f}, {start_lng:.6f}) to ({end_lat:.6f}, {end_lng:.6f})."
+    )
+    
+    try:
+        # OSRM expects coordinates as lng,lat (opposite of most APIs)
+        base_url = Config.OSRM_BASE_URL
+        url = f"{base_url}/route/v1/driving/{start_lng},{start_lat};{end_lng},{end_lat}"
+        
+        params = {
+            "overview": "full",  # Get full route geometry
+            "geometries": "geojson",  # Return GeoJSON geometry format
+            "steps": "true",     # Include step-by-step instructions
+            "annotations": "true"  # Include additional route details
+        }
+        
+        response = requests.get(url, params=params, timeout=OSRM_TIMEOUT)
+        response.raise_for_status()
+        data = response.json()
+        
+        if data.get("code") != "Ok" or not data.get("routes"):
+            error_message = data.get("message", "OSRM could not find a route")
+            log.warning(f"OSRM routing failed: {error_message}")
+            return {"code": "NoRoute", "message": error_message}
+        
+        parsed_routes = []
+        for route in data["routes"]:
+            parsed_route = _parse_osrm_route(route)
+            if parsed_route:
+                parsed_routes.append(parsed_route)
+        
+        if not parsed_routes:
+            log.error("Failed to parse any route data from OSRM response.")
+            return {"code": "Error", "message": "Failed to process route data from fallback routing service."}
+        
+        # Extract waypoints
+        waypoints = []
+        for waypoint in data.get("waypoints", []):
+            waypoints.append({
+                "name": waypoint.get("name", ""),
+                "location": waypoint.get("location", [0, 0])  # [lng, lat]
+            })
+        
+        return {"code": "Ok", "routes": parsed_routes, "waypoints": waypoints}
+    
+    except requests.exceptions.Timeout:
+        log.error("OSRM API request timed out after %s seconds.", OSRM_TIMEOUT)
+        return {"code": "Error", "message": "Fallback routing service request timed out."}
+    
+    except requests.exceptions.RequestException as e:
+        log.error(f"OSRM API request failed: {e}")
+        return {"code": "Error", "message": "Fallback routing service request failed."}
+    
+    except Exception as e:
+        log.exception("Unexpected error during OSRM route calculation: %s", e)
+        return {"code": "Error", "message": "An unexpected error occurred during fallback route calculation."}
+
+
+def _calculate_route_with_fallback(
+    start_lat: float, start_lng: float, end_lat: float, end_lng: float, alternatives: int = DEFAULT_ALTERNATIVES
+) -> dict:
+    """
+    Calculates a route first using GraphHopper, falling back to OSRM if GraphHopper fails.
+    This is particularly useful for long routes that might exceed GraphHopper's limits.
+    
+    Args:
+        start_lat (float): Latitude of the starting point.
+        start_lng (float): Longitude of the starting point.
+        end_lat (float): Latitude of the destination point.
+        end_lng (float): Longitude of the destination point.
+        alternatives (int, optional): Number of route alternatives to try to get. Defaults to DEFAULT_ALTERNATIVES.
+        
+    Returns:
+        dict: A dictionary containing routing information with results from either GraphHopper or OSRM.
+    """
+    # First try GraphHopper
+    graphhopper_result = _calculate_graphhopper_routes(
+        start_lat, start_lng, end_lat, end_lng, alternatives
+    )
+    
+    # If GraphHopper succeeded, return its result
+    if graphhopper_result.get("code") == "Ok":
+        log.info("Successfully calculated route using GraphHopper.")
+        return graphhopper_result
+    
+    # Check for specific failure conditions where we should try OSRM
+    failure_code = graphhopper_result.get("code")
+    
+    # Determine if we should try the fallback
+    should_try_fallback = (
+        failure_code == "Timeout" or  # Timeout likely indicates a long, complex route
+        failure_code == "Error" or    # General errors might be due to route complexity
+        (
+            # Check if this is potentially a long route that exceeds GraphHopper limits
+            _haversine_distance(start_lat, start_lng, end_lat, end_lng) > LONG_ROUTE_THRESHOLD_KM
+        )
+    )
+    
+    if should_try_fallback:
+        log.info(f"GraphHopper routing failed with code '{failure_code}'. Attempting fallback to OSRM.")
+        osrm_result = _calculate_osrm_route(start_lat, start_lng, end_lat, end_lng)
+        
+        if osrm_result.get("code") == "Ok":
+            log.info("Successfully calculated route using OSRM fallback.")
+            return osrm_result
+        else:
+            log.error("Both GraphHopper and OSRM fallback failed to calculate a route.")
+    
+    # If fallback wasn't tried or also failed, return the original GraphHopper error
+    return graphhopper_result
+
+
+# --- Update the optimized route function to use the fallback routing mechanism ---
+def _get_optimized_route(start_lat: float, start_lng: float, end_lat: float, end_lng: float, optimization_type: str) -> dict:
+    """
+    Internal function orchestrating the route optimization process.
+
+    Calculates route alternatives, retrieves cell tower data, selects the best route based on the specified optimization type,
+    and formats the final response.
+
+    Args:
+        start_lat (float): Latitude of the starting point.
+        start_lng (float): Longitude of the starting point.
+        end_lat (float): Latitude of the destination point.
+        end_lng (float): Longitude of the destination point.
+        optimization_type (str): Route optimization type ('fastest', 'cell_coverage', 'balanced').
+
+    Returns:
+        dict: A dictionary containing the optimized route information.
+              On success, includes 'code': 'Ok', 'routes' (list containing the selected route), 'waypoints', 'towers' (towers along the route),
+              'optimization_type', and 'tower_data_source'.
+              On failure, returns an error dictionary with 'code' and 'message' indicating the error.
+    """
+    # 1. Fetch route alternatives, using fallback if necessary
+    route_alternatives_response = _calculate_route_with_fallback(start_lat, start_lng, end_lat, end_lng)
+
+    if route_alternatives_response.get("code") != "Ok":
+        log.error(f"Failed to get route alternatives for '{optimization_type}' optimization. Reason: {route_alternatives_response.get('message', 'Unknown error')}")
+        return route_alternatives_response  # Return the error response
+
+    alternative_routes = route_alternatives_response.get("routes", [])
+    waypoints = route_alternatives_response.get("waypoints", [])
+    
+    # Check if we're using a fallback routing provider
+    routing_provider = "graphhopper"  # Default
+    if alternative_routes and alternative_routes[0].get("routing_provider"):
+        routing_provider = alternative_routes[0].get("routing_provider")
+        
+    # 2. Get cell tower data for the route area
+    # Rest of the function is the same - optimize route based on towers
+    # ... existing optimization code ...
+    
+    # Add routing provider info to the response
+    result = _select_optimized_routes(alternative_routes, [])  # Use the existing optimization function
+    
+    # 3. Get cell tower data for the route area
+    bounds = _calculate_bounds_from_routes(alternative_routes)
+    towers_in_area = get_cell_towers(bounds["min_lat"], bounds["min_lng"], bounds["max_lat"], bounds["max_lng"])
+
+    # Find towers along each route
+    for route in alternative_routes:
+        if "geometry" in route and "coordinates" in route["geometry"]:
+            route_coords = [(coord[1], coord[0]) for coord in route["geometry"]["coordinates"]]  # Convert from [lng, lat] to [lat, lng]
+            route["towers"] = find_towers_along_route(route_coords, towers_in_area, TOWER_PROXIMITY_METERS)
+        else:
+            route["towers"] = []  # No geometry data, so no towers
+
+    # 4. Select the optimized route based on the requested optimization type
+    result = _select_optimized_routes(alternative_routes, towers_in_area)
+    
+    if result.get("code") != "Ok" or not result.get("routes"):
+        log.error(f"Failed to select optimized route of type '{optimization_type}'.")
+        return {"code": "Error", "message": "Failed to optimize route."}
+
+    # Determine the optimized route from the result
+    optimized_route = result["routes"][0]
+    
+    # Add the routing provider to the response
+    result["routing_provider"] = routing_provider
+    
+    # 5. Format the response with the optimization type and tower data source
+    result["optimization_type"] = optimization_type
+    result["tower_data_source"] = "OpenCellId"  # Data source is currently fixed
+    return result
 
 
 def _select_optimized_routes(alternative_routes: list[dict], towers_in_area: list[dict]) -> dict:
@@ -345,81 +633,6 @@ def _select_optimized_routes(alternative_routes: list[dict], towers_in_area: lis
 
 
 # --- Public Service Functions ---
-def _get_optimized_route(start_lat: float, start_lng: float, end_lat: float, end_lng: float, optimization_type: str) -> dict:
-    """
-    Internal function orchestrating the route optimization process.
-
-    Calculates route alternatives, retrieves cell tower data, selects the best route based on the specified optimization type,
-    and formats the final response.
-
-    Args:
-        start_lat (float): Latitude of the starting point.
-        start_lng (float): Longitude of the starting point.
-        end_lat (float): Latitude of the destination point.
-        end_lng (float): Longitude of the destination point.
-        optimization_type (str): Route optimization type ('fastest', 'cell_coverage', 'balanced').
-
-    Returns:
-        dict: A dictionary containing the optimized route information.
-              On success, includes 'code': 'Ok', 'routes' (list containing the selected route), 'waypoints', 'towers' (towers along the route),
-              'optimization_type', and 'tower_data_source'.
-              On failure, returns an error dictionary with 'code' and 'message' indicating the error.
-    """
-    # 1. Fetch route alternatives from GraphHopper API
-    route_alternatives_response = _calculate_graphhopper_routes(start_lat, start_lng, end_lat, end_lng)
-
-    if route_alternatives_response.get("code") != "Ok":
-        log.error(f"Failed to get route alternatives for '{optimization_type}' optimization. Reason: {route_alternatives_response.get('message', 'Unknown error')}")
-        return route_alternatives_response  # Return the error response from GraphHopper
-
-    alternative_routes = route_alternatives_response.get("routes", [])
-    waypoints = route_alternatives_response.get("waypoints", [])
-
-    if not alternative_routes:  # Double check for empty routes even with 'Ok' code
-        log.error("No route alternatives returned from routing service despite 'Ok' status. Route calculation failed.")
-        return {"code": "NoRoute", "message": "No routes found between the specified points."}
-
-    # 2. Fetch cell towers in the vicinity of the route
-    min_latitude = min(start_lat, end_lat) - TOWER_SEARCH_BUFFER
-    max_latitude = max(start_lat, end_lat) + TOWER_SEARCH_BUFFER
-    min_longitude = min(start_lng, end_lng) - TOWER_SEARCH_BUFFER
-    max_longitude = max(start_lng, end_lng) + TOWER_SEARCH_BUFFER
-
-    cell_towers_data = get_cell_towers(min_latitude, min_longitude, max_latitude, max_longitude)
-    all_cell_towers_in_area = cell_towers_data.get("towers", [])
-    tower_data_source_info = cell_towers_data.get("source", "unknown")
-    log.info(f"Fetched {len(all_cell_towers_in_area)} cell towers (source: {tower_data_source_info}) within the route area.")
-
-    # 3. Select the optimized route based on the specified optimization_type
-    optimized_route_selection = _select_optimized_routes(alternative_routes, all_cell_towers_in_area)
-    selected_route_information = optimized_route_selection.get(optimization_type)
-
-    if not selected_route_information or not selected_route_information.get("route"): # Fallback to fastest if selected type fails
-        log.error(f"Could not determine a suitable route for '{optimization_type}'. Falling back to fastest route.")
-        fastest_route_fallback = optimized_route_selection.get("fastest")
-        if fastest_route_fallback and fastest_route_fallback.get("route"):
-            selected_route_information = fastest_route_fallback # Use fastest as fallback
-        else:
-            return {"code": "NoRoute", "message": f"Could not determine any suitable route for '{optimization_type}'."} # If even fastest fails, return error
-
-    # 4. Construct and return the final result object
-    final_route = selected_route_information["route"]
-    final_towers_along_route = selected_route_information["towers"]
-
-    result = {
-        "code": "Ok",
-        "routes": [final_route],  # API expects 'routes' as a list
-        "waypoints": waypoints,
-        "towers": final_towers_along_route,  # Cell towers along the selected route
-        "optimization_type": optimization_type,  # Indicate the type of route optimization
-        "tower_data_source": tower_data_source_info,  # Source of cell tower data
-    }
-    log.info(
-        f"Successfully calculated and selected '{optimization_type}' route. Distance: {final_route.get('distance', 0):.0f}m, Duration: {final_route.get('duration', 0):.0f}s, Towers along route: {len(final_towers_along_route)}"
-    )
-    return result
-
-
 def get_route_fastest(start_lat: float, start_lng: float, end_lat: float, end_lng: float) -> dict:
     """
     Public function to get the fastest route between given coordinates.

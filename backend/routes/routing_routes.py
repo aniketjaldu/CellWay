@@ -106,59 +106,70 @@ def calculate_route():
         ), 500  # 500 for internal server errors
 
 
-@routing_bp.route("/routing/save", methods=["POST"])  # Renamed from /save-route
+@routing_bp.route("/routing/save", methods=["POST"])
 @login_required
 def save_route():
     """
-    Endpoint for saving a route for the logged-in user. Requires authentication.
+    Endpoint for saving a route for the currently logged-in user. Requires authentication.
 
-    Expects JSON data in the request body containing route details:
-    - 'origin' (dict): Origin location details {place_name, lat, lng}.
-    - 'destination' (dict): Destination location details {place_name, lat, lng}.
-    - 'route_data' (dict): Detailed route data object(s).
-    - 'route_type' (str): Route optimization type ('balanced', 'fastest', etc.).
-    - 'route_image' (str, optional): Base64 encoded image of the route map.
-    - 'route_geometry' (dict, optional): Pre-calculated geometry for display.
-    - 'has_multiple_routes' (bool, optional): Flag for multiple route types.
+    Expected JSON request body:
+        {
+            "origin": { "place_name": "...", "lat": 0.0, "lng": 0.0 },
+            "destination": { "place_name": "...", "lat": 0.0, "lng": 0.0 },
+            "route_data": [{ ... }],  // Array of route objects (e.g., fastest, balanced, cell_coverage)
+            "route_type": "balanced",  // Active route type at time of save
+            "route_image": "data:image/png;base64,...",  // Optional: Base64 encoded image of the route
+            "has_multiple_routes": true  // Optional: Indicates if multiple route types were calculated
+        }
 
     Returns:
-        jsonify: JSON response indicating success or error.
-                 Returns 201 status on successful route saving with the new route ID.
-                 Returns 400 status for missing or invalid request data.
+        jsonify: JSON response with success or error message.
+                 Returns 201 status on successful route creation.
+                 Returns 400 status for invalid request.
                  Returns 500 status for unexpected server errors or model errors.
     """
     user_id = session["user_id"]  # Get user ID from session (login_required ensures it exists)
-    data = request.json
+    data = request.json  # Get JSON data from request
 
-    # Extract route details from JSON data
+    # --- Extract and Validate Request Data ---
+    # Required fields
+    if not data:
+        log.warning("Save route rejected: No JSON data in request.")
+        return jsonify({"error": "No route data provided."}), 400
+
     origin = data.get("origin")
     destination = data.get("destination")
     route_data = data.get("route_data")
-    route_type = data.get("route_type", "balanced")  # Default to 'balanced' if not provided
-    route_image = data.get("route_image")
-    route_geometry = data.get("route_geometry")
-    has_multiple_routes = data.get("has_multiple_routes", False)  # Default to False if not provided
 
-    # Validate that required data is present
-    if not all([origin, destination, route_data, route_type]):
-        log.warning(f"Save route request failed for user '{user_id}': Missing required data.")
-        return jsonify(
-            {
-                "error": "Missing required data (origin, destination, route_data, route_type)"
-            }
-        ), 400
-    if not isinstance(origin, dict) or not isinstance(destination, dict):
-        log.warning(
-            f"Save route request failed for user '{user_id}': Invalid origin/destination format."
-        )
-        return jsonify({"error": "Invalid origin/destination format"}), 400
-    if not all(key in origin for key in ["lat", "lng"]) or not all(
-        key in destination for key in ["lat", "lng"]
-    ):
-        log.warning(
-            f"Save route request failed for user '{user_id}': Missing 'lat' or 'lng' in origin/destination."
-        )
-        return jsonify({"error": "Missing 'lat' or 'lng' in origin/destination"}), 400
+    # Validate required fields
+    if not origin or not isinstance(origin, dict) or not all(key in origin for key in ["lat", "lng"]):
+        log.warning("Save route rejected: Missing or invalid origin data.")
+        return jsonify({"error": "Origin must include lat and lng coordinates."}), 400
+
+    if not destination or not isinstance(destination, dict) or not all(key in destination for key in ["lat", "lng"]):
+        log.warning("Save route rejected: Missing or invalid destination data.")
+        return jsonify({"error": "Destination must include lat and lng coordinates."}), 400
+
+    if not route_data:
+        log.warning("Save route rejected: Missing route_data.")
+        return jsonify({"error": "Route data is required."}), 400
+
+    # Optional fields with defaults
+    route_type = data.get("route_type", "balanced")  # Default to balanced if not specified
+    route_image = data.get("route_image")  # Optional base64 image of route
+    has_multiple_routes = data.get("has_multiple_routes", False)  # Default to false
+
+    # Extract route geometry for easier display
+    route_geometry = None
+    if isinstance(route_data, dict) and route_data.get(route_type) and route_data[route_type].get("routes"):
+        selected_route = route_data[route_type]["routes"][0]  # Assume first route of selected type
+        if selected_route and "geometry" in selected_route:
+            route_geometry = selected_route["geometry"]  # Extract geometry for more efficient display later
+
+    # Check for the routing provider information
+    routing_provider = "graphhopper"  # Default to GraphHopper for backwards compatibility
+    if isinstance(route_data, dict) and route_data.get(route_type) and route_data[route_type].get("routing_provider"):
+        routing_provider = route_data[route_type]["routing_provider"]
 
     try:
         # Call the route model to save the route to the database
@@ -171,6 +182,7 @@ def save_route():
             route_image=route_image,
             route_geometry=route_geometry,
             has_multiple_routes=has_multiple_routes,
+            routing_provider=routing_provider,  # Pass the routing provider
         )
         if error:
             log.error(f"Error saving route for user '{user_id}': {error}")
