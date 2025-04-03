@@ -62,9 +62,9 @@ const ResetPasswordForm = () => {
       // Ensure we're using the API with the correct base URL (from the .env VITE_API_BASE_URL)
       const resetResult = await resetPassword(token, newPassword); // Call resetPassword from useAuth hook
       if (resetResult.success) {
-        setMessage(resetResult.message || 'Password reset successful. Redirecting to login page...');
+        setMessage(resetResult.message || 'Password reset successful. Redirecting to home page...');
         setTimeout(() => {
-          navigate('/login'); // Redirect to login page after successful reset
+          navigate('/'); // Redirect to home page after successful reset
         }, 3000); // Short delay before redirection
       } else {
         setError(resetResult.error || 'Password reset attempt failed. Please check your token or try again.');
@@ -162,17 +162,17 @@ const ResetPasswordForm = () => {
             </div>
 
             <div className="auth-switch-links">
-              <Link to="/login">Back to Login</Link> {/* Link back to login page */}
+              <Link to="/">Back to Home</Link> {/* Link back to home page instead of login */}
             </div>
           </form>
         )}
 
 
-        {/* --- Back to Login Link (if token is missing or after success) --- */}
+        {/* --- Back to Home Link (if token is missing or after success) --- */}
         {!showResetForm && !message && (
           <div className="auth-form-body">
             <div className="auth-switch-links">
-              <Link to="/login">Back to Login</Link> {/* Link back to login page */}
+              <Link to="/">Back to Home</Link> {/* Link back to home page instead of login */}
             </div>
           </div>
         )}
