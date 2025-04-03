@@ -6,7 +6,7 @@ load_dotenv()
 class Config:
     # --- General Configuration ---
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'super-secret-key'
-    FRONTEND_URL = os.environ.get('FRONTEND_URL') or 'http://localhost:5173' 
+    FRONTEND_URL = os.environ.get('FRONTEND_URL')
 
     # --- API Keys ---
     MAPTILER_KEY = os.environ.get('MAPTILER_KEY')

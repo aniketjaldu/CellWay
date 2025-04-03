@@ -194,7 +194,7 @@ def forgot_password():
     if token:
         log.info(f"Password reset initiated for email: {email}")
         try:
-            frontend_url = current_app.config.get("FRONTEND_URL", "http://localhost:5173")  # Get frontend URL from config
+            frontend_url = current_app.config.get("FRONTEND_URL")  # Get frontend URL from config
             reset_url = f"{frontend_url}/reset-password?token={token}"  # Construct reset URL
 
             subject = "Password Reset Request"
@@ -213,7 +213,7 @@ def forgot_password():
             If you did not request a password reset, please ignore this email. Your password will remain unchanged.
 
             Thanks,
-            Your App Team
+            Cellway Team
             """  # Plain text email body
             body_html = f"""
             <p>Hello,</p>
@@ -222,7 +222,7 @@ def forgot_password():
             <p><a href="{reset_url}">{reset_url}</a></p>
             <p>This link will expire in <strong>1 hour</strong>.</p>
             <p>If you did not request a password reset, please ignore this email. Your password will remain unchanged.</p>
-            <p>Thanks,<br/>Your App Team</p>
+            <p>Thanks,<br/>Cellway Team</p>
             """  # HTML email body
 
             if not sender:
