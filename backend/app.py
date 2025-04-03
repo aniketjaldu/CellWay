@@ -35,7 +35,7 @@ def get_cell_towers(min_latitude, min_longitude, max_latitude, max_longitude):
     
     # Load CSV only once and cache it
     if _CELL_TOWERS_DF is None:
-        _CELL_TOWERS_DF = pd.read_csv(_CSV_FILE_PATH)
+        _CELL_TOWERS_DF = pd.read_csv("data/cell_towers.csv")
         
     # Filter the cached DataFrame
     cell_towers_df_filtered = _CELL_TOWERS_DF[
