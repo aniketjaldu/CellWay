@@ -134,7 +134,38 @@ def get_user():
     For more detailed user information, additional logic can be added here or in a separate endpoint.
     """
     user_id = session.get("user_id")
+    log.info(f"Session user retrieved: {user_id}")
     return jsonify({"user_id": user_id})
+
+
+# --- Session Diagnostics Endpoint ---
+@auth_bp.route("/auth/session-check", methods=["GET"])
+def session_check():
+    """
+    Diagnostic endpoint to check session status.
+    
+    Returns information about the current session, including whether user_id exists
+    and session cookie parameters. Doesn't require authentication.
+    """
+    # Check session contents
+    session_data = {
+        "has_user_id": "user_id" in session,
+        "session_keys": list(session.keys()) if session else [],
+    }
+    
+    # Additional request details for diagnostics
+    request_info = {
+        "has_cookies": bool(request.cookies),
+        "cookie_names": list(request.cookies.keys()) if request.cookies else [],
+        "headers": {k: v for k, v in request.headers.items() if k.lower() in ["origin", "referer", "host", "user-agent"]},
+    }
+    
+    log.info(f"Session diagnostic check: {session_data}")
+    return jsonify({
+        "session": session_data,
+        "request": request_info,
+        "message": "This endpoint is for debugging session issues"
+    })
 
 
 # --- Password Reset Endpoints ---

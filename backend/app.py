@@ -70,6 +70,17 @@ def create_app(config_class=Config) -> Flask:
             "SECRET_KEY is not set in configuration. Using a randomly generated secret key. "
             "Sessions will be invalidated on application restart. This is not recommended for production."
         )
+    
+    # Configure session cookie settings
+    app.config['SESSION_COOKIE_SECURE'] = True  # Only send cookies over HTTPS
+    app.config['SESSION_COOKIE_HTTPONLY'] = True  # Prevent JavaScript access to cookies
+    app.config['SESSION_COOKIE_SAMESITE'] = 'None'  # Allow cross-site cookies (needed for ngrok/different domains)
+    # Only set domain if in production (not for localhost development)
+    if "ngrok" in app.config.get('FRONTEND_URL', '') or "cellway.tech" in app.config.get('FRONTEND_URL', ''):
+        # Extract domain from FRONTEND_URL or set to None to let the browser handle it
+        app.config['SESSION_COOKIE_DOMAIN'] = None  # Let browser determine the cookie domain
+    
+    log.info("Session cookie configuration set for cross-origin authentication")
 
     # --- Initialize Flask Extensions ---
     mail.init_app(app)  # Initialize Flask-Mail with the Flask application
@@ -77,16 +88,19 @@ def create_app(config_class=Config) -> Flask:
 
     # --- Configure CORS (Cross-Origin Resource Sharing) ---
     frontend_origins = ["http://localhost:5173", "http://127.0.0.1:5173",
-                        "https://cell-way.vercel.app", "cell-way.vercel.app", "http://cell-way.vercel.app", 
-                        "https://cellway.tech", "www.cellway.tech", "http://cellway.tech",
+                        "https://cell-way.vercel.app", "https://www.cell-way.vercel.app", 
+                        "http://cell-way.vercel.app", "http://www.cell-way.vercel.app",
+                        "https://cellway.tech", "https://www.cellway.tech", 
+                        "http://cellway.tech", "http://www.cellway.tech",
                         "https://cellway-backend.ngrok.app"]
     
+    # Configure CORS with explicit resource configuration to ensure it works correctly
     CORS(
         app,
+        resources={r"/api/*": {"origins": frontend_origins, "supports_credentials": True}},
         supports_credentials=True
-        # resources={r"/api/*": {"origins": frontend_origins, "supports_credentials": True}},
     )
-    log.info(f"CORS configured to allow requests from origins: {frontend_origins}")
+    log.info(f"CORS configured to allow credentials for origins: {frontend_origins}")
 
     # --- Register API Blueprints ---
     from routes.auth_routes import auth_bp  # Import authentication blueprint

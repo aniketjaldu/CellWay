@@ -49,6 +49,25 @@ export const useAuth = () => {
   }, [checkSession]); // Dependency: the checkSession function itself
 
 
+  // --- Session Expiration Event Listener ---
+  // Listen for custom session expiration events from API interceptor
+  useEffect(() => {
+    const handleSessionExpired = () => {
+      console.warn("Session expired event received");
+      setUser(null); // Clear user state
+      // Optional: Show a persistent message or redirect to login page
+    };
+    
+    // Add event listener for the custom event
+    window.addEventListener('auth:sessionExpired', handleSessionExpired);
+    
+    // Clean up event listener on component unmount
+    return () => {
+      window.removeEventListener('auth:sessionExpired', handleSessionExpired);
+    };
+  }, []); // Empty dependency array ensures this runs once
+
+
   // --- Login Function ---
   const login = useCallback(async (email, password) => {
     try {

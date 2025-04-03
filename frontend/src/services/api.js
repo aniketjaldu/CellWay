@@ -67,6 +67,80 @@ api.interceptors.response.use(
   }
 );
 
+// --- Axios Response Interceptor ---
+// Intercepts all responses globally to handle common error scenarios.
+api.interceptors.response.use(
+  // --- Success Handler ---
+  // For successful responses (status code 2xx), simply return the response.
+  (response) => response,
+
+  // --- Error Handler ---
+  // For error responses (status codes 3xx, 4xx, 5xx) or network errors.
+  async (error) => {
+    const status = error.response?.status; // HTTP status code from the response
+    const message = error.response?.data?.error || error.message; // Error message from backend or Axios error message
+    const requestUrl = error.config?.url; // URL of the failed request
+    const originalRequest = error.config; // Original request configuration
+
+    console.error(`API Error: Status ${status || 'Network Error'} on ${requestUrl} - ${message}`); // Log detailed error
+    
+    // --- Session Recovery Logic ---
+    // Special handling for 401 errors to attempt session recovery
+    if (status === 401 && !originalRequest._retry) {
+      // Skip recovery on login-related endpoints as they inherently handle auth
+      const isAuthEndpoint = requestUrl?.includes('/auth/login') || 
+                           requestUrl?.includes('/auth/register') ||
+                           requestUrl?.includes('/auth/logout');
+      
+      // Only try to recover for non-auth endpoints and not for session check
+      if (!isAuthEndpoint && !requestUrl?.endsWith('/auth/user')) {
+        try {
+          // Mark request so we don't retry infinitely
+          originalRequest._retry = true;
+          
+          // Check if we still have a valid session by calling session-check endpoint
+          const sessionCheck = await api.get('/auth/session-check');
+          
+          if (sessionCheck.data?.session?.has_user_id) {
+            // If we still have a user ID in session, retry the original request
+            return api(originalRequest);
+          } else {
+            // Session truly expired, inform user
+            toast.error("Your session has expired. Please log in again.", { id: 'session-expired' });
+            // Could trigger a custom event here to redirect to login
+            window.dispatchEvent(new CustomEvent('auth:sessionExpired'));
+          }
+        } catch (recoveryError) {
+          console.error("Session recovery failed:", recoveryError);
+        }
+      }
+    }
+
+    // --- Regular Error Handling ---
+    if (status === 401) {
+      // Unauthorized: User is not logged in or session expired.
+      // Avoid showing toast for the initial session check ('/auth/user') as 401 is expected if not logged in.
+      if (!requestUrl?.endsWith('/auth/user') && !originalRequest._retry) {
+        // Only show for non-recovery attempts to avoid duplicate toasts
+        toast.error("Authentication required. Please log in.", { id: 'auth-error-401' });
+      }
+    } else if (status === 403) {
+      // Forbidden: User is logged in but lacks permission for the action.
+      toast.error("You don't have permission for this action.", { id: 'auth-error-403' });
+    } else if (status === 500 || status === 503) {
+      // Server Error (500 Internal Server Error, 503 Service Unavailable): Backend issue.
+      toast.error("A server error occurred. Please try again later or contact support.", { id: 'server-error-5xx' });
+    } else if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+      // Timeout Error: Request took too long.
+      toast.error("The request timed out. Please check your connection and try again.", { id: 'timeout-error' });
+    }
+
+    // IMPORTANT: Reject the promise to ensure the error propagates
+    // to the .catch() block of the original API call in the component/hook.
+    return Promise.reject(error);
+  }
+);
+
 
 // ==================================================
 //               API Endpoint Functions
@@ -227,6 +301,13 @@ export const getMapConfig = async () => {
     throw error;
   }
 };
+
+// --- Add Session Check Endpoint ---
+/**
+ * Checks session status for diagnostics.
+ * @returns {Promise<axios.AxiosResponse<any>>} Session status information.
+ */
+export const checkSessionStatus = () => api.get('/auth/session-check');
 
 // --- Default Export ---
 // Export the configured Axios instance if it needs to be used directly elsewhere (e.g., for custom requests).
