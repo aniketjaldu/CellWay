@@ -28,6 +28,7 @@ const ResetPasswordForm = () => {
   // --- Token Initialization Effect ---
   useEffect(() => {
     const urlToken = searchParams.get('token');
+    console.log('Reset token from URL:', urlToken);
     if (urlToken) {
       setToken(urlToken); // Set token from URL query parameter
     } else {
@@ -58,6 +59,7 @@ const ResetPasswordForm = () => {
 
     setIsLoading(true); // Start loading/processing state
     try {
+      // Ensure we're using the API with the correct base URL (from the .env VITE_API_BASE_URL)
       const resetResult = await resetPassword(token, newPassword); // Call resetPassword from useAuth hook
       if (resetResult.success) {
         setMessage(resetResult.message || 'Password reset successful. Redirecting to login page...');
@@ -68,7 +70,7 @@ const ResetPasswordForm = () => {
         setError(resetResult.error || 'Password reset attempt failed. Please check your token or try again.');
       }
     } catch (apiError) {
-      log.error("Password reset error:", apiError);
+      console.error("Password reset error:", apiError);
       setError(apiError.message || 'An unexpected error occurred during password reset. Please try again later.');
     } finally {
       setIsLoading(false); // End loading state regardless of outcome

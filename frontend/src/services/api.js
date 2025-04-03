@@ -189,7 +189,10 @@ export const forgotPasswordRequest = (email) => api.post('/auth/forgot-password'
  * @param {string} newPassword - The new password chosen by the user.
  * @returns {Promise<axios.AxiosResponse<any>>} Axios response promise.
  */
-export const resetPassword = (token, newPassword) => api.post('/auth/reset-password', { token, newPassword });
+export const resetPassword = (token, newPassword) => {
+  console.log('Resetting password with API call to:', `${import.meta.env.VITE_API_BASE_URL}/auth/reset-password`);
+  return api.post('/auth/reset-password', { token, newPassword });
+};
 
 
 // --- Routing Endpoints ---
