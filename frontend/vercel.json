@@ -6,6 +6,6 @@
     { "src": "/(.*)", "dest": "/index.html" }
   ],
   "env": {
-    "VITE_API_BASE_URL": "https://ee29-108-7-61-127.ngrok-free.app/api"
+    "VITE_API_BASE_URL": "https://giving-equal-bluegill.ngrok-free.api"
   }
 }

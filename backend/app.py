@@ -79,11 +79,12 @@ def create_app(config_class=Config) -> Flask:
     frontend_origins = ["http://localhost:5173", "http://127.0.0.1:5173",
                         "https://cell-way.vercel.app", "cell-way.vercel.app", "http://cell-way.vercel.app", 
                         "https://cellway.tech", "www.cellway.tech", "http://cellway.tech",
-                        "https://ee29-108-7-61-127.ngrok-free.app"]
+                        "https://giving-equal-bluegill.ngrok-free.app"]
     
     CORS(
         app,
-        resources={r"/api/*": {"origins": frontend_origins, "supports_credentials": True}},
+        supports_credentials=True
+        # resources={r"/api/*": {"origins": frontend_origins, "supports_credentials": True}},
     )
     log.info(f"CORS configured to allow requests from origins: {frontend_origins}")
 
