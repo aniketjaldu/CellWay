@@ -29,7 +29,6 @@ def save_route(
     route_image: str = None,
     route_geometry: dict = None,
     has_multiple_routes: bool = False,
-    routing_provider: str = "graphhopper",  # Added routing provider parameter
 ) -> tuple[str, str | None]:
     """
     Saves a route for a user, enforcing a maximum limit on saved routes per user.
@@ -46,7 +45,6 @@ def save_route(
         route_image (str, optional): Base64 encoded image of the route map. Defaults to None.
         route_geometry (dict, optional): Pre-calculated geometry data for route display. Defaults to None.
         has_multiple_routes (bool): Flag indicating if multiple route types were computed. Defaults to False.
-        routing_provider (str): The routing service that provided the route ('graphhopper', 'osrm'). Defaults to 'graphhopper'.
 
     Returns:
         tuple[str, str | None]: A tuple containing the new route's ID (as a string) and None on success,
@@ -84,7 +82,6 @@ def save_route(
             "route_type": route_type,
             "route_geometry": route_geometry,
             "has_multiple_routes": has_multiple_routes,
-            "routing_provider": routing_provider,  # Save the routing provider
             "created_at": datetime.datetime.utcnow(),
         }
         if route_image:
@@ -93,7 +90,7 @@ def save_route(
         # Insert the new route into the collection
         insert_result = routes_collection.insert_one(new_route)
         new_route_id_str = str(insert_result.inserted_id)
-        log.info(f"Successfully saved new route '{new_route_id_str}' for user '{user_identifier}' using {routing_provider}.")
+        log.info(f"Successfully saved new route '{new_route_id_str}' for user '{user_identifier}'.")
         return new_route_id_str, None
 
     except Exception as e:
@@ -130,11 +127,6 @@ def get_saved_routes(user_id: str) -> tuple[list[dict], str | None]:
             route["_id"] = str(route["_id"])  # Convert ObjectId to string for consistent handling
             if "user_id" in route:
                 route["user_id"] = str(route["user_id"])  # Ensure user_id is also a string
-            
-            # Ensure routing_provider field exists, default to graphhopper for backward compatibility
-            if "routing_provider" not in route:
-                route["routing_provider"] = "graphhopper"  # Set default provider for routes saved before this feature
-                
             routes.append(route)
 
         log.info(f"Retrieved {len(routes)} saved routes for user '{user_identifier}'.")

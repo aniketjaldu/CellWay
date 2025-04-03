@@ -12,10 +12,6 @@ class Config:
     MAPTILER_KEY = os.environ.get('MAPTILER_KEY')
     MONGODB_URI = os.environ.get('MONGODB_URI') or 'mongodb://localhost:27017/cellway' 
     GRAPHHOPPER_KEY = os.environ.get('GRAPHHOPPER_KEY')
-    
-    # --- Routing Services ---
-    # OSRM public instance - fallback for when GraphHopper fails with long routes
-    OSRM_BASE_URL = os.environ.get('OSRM_BASE_URL') or 'https://router.project-osrm.org'
 
     # --- Flask-Mail Configuration ---
     MAIL_SERVER = os.environ.get('MAIL_SERVER')

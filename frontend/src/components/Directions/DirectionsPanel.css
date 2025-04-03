@@ -300,10 +300,3 @@
   .icon-depart, .icon-start { background-color: #2a93ee1a; color: #2A93EE; }
   
   .icon-default { background-color: #f1f1f1; color: #757575; } /* Default icon style */
-
-.directions-routing-provider {
-  font-size: 0.8rem;
-  color: #666;
-  margin-top: 2px;
-  font-style: italic;
-}
