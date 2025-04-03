@@ -11,6 +11,13 @@
     flex-direction: column;
     gap: 10px;
   }
+
+  @media (max-width: 768px) {
+    .auth-buttons-container {
+      bottom: auto;
+      top: 20px;
+    }
+  }
   
   .auth-button {
     padding: 8px 15px;
