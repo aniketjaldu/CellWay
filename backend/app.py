@@ -17,7 +17,7 @@ from config import Config  # Absolute import for configuration
 
 # --- Logging Configuration ---
 logging.basicConfig(
-    level=logging.INFO,  # Set default logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+    level=logging.INFO,  # Set default logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)r
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",  # Log message format
     datefmt="%Y-%m-%d %H:%M:%S",  # Date format in logs
 )

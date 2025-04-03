@@ -12,3 +12,5 @@ polyline==2.0.2
 pytest==7.4.0
 pytest-flask==1.2.0
 gunicorn==21.2.0
+pandas==2.2.3  
+shapely==2.1.0

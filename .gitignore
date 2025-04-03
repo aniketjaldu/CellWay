@@ -31,6 +31,12 @@ backend/models/__pycache__
 backend/routes/__pycache__
 backend/services/__pycache__
 backend/utils/__pycache__
+backend\__pycache__
+backend\cache
+backend\models\__pycache__
+backend\routes\__pycache__
+backend\services\__pycache__
+backend\utils\__pycache__
 
 # Ignore environment files
 .env
