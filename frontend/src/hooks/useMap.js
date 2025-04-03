@@ -1,6 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
 import { toast } from 'react-hot-toast';
 import { getMapConfig } from '../services/api';
 
@@ -153,7 +152,9 @@ export const useMap = (mapContainerRef) => {
         setMapIsReady(false);
       }
     };
-  }, [mapContainerRef, mapConfig, fetchMapConfig]);
+  // Use ref identity for mapContainerRef to avoid recreation on render
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [/* Only depend on mapContainerRef.current identity, not re-fetch on auth changes */]);
 
 
   // --- Marker Management ---

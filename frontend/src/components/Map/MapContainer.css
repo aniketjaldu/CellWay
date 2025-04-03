@@ -33,3 +33,26 @@
   .map-container .leaflet-popup-pane {
       z-index: 600; /* Ensure popups are above controls */
   }
+
+  /* ==================================================
+     MAP CONTAINER - Attribution Control Styling
+     ================================================== */
+  
+  /* Custom styling for attribution control to ensure consistency */
+  .map-container .leaflet-control-attribution {
+    background: rgba(255, 255, 255, 0.8);
+    color: #333;
+    font-size: 11px;
+    line-height: 1.4;
+    padding: 0 5px;
+    margin: 0;
+  }
+  
+  .map-container .leaflet-control-attribution a {
+    color: #0078A8;
+    text-decoration: none;
+  }
+  
+  .map-container .leaflet-control-attribution a:hover {
+    text-decoration: underline;
+  }
