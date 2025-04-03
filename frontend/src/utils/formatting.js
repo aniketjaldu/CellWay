@@ -11,6 +11,38 @@
 // ==================================================
 
 /**
+ * Converts distance from meters to miles and formats it as a string with units.
+ * 
+ * @param {number | undefined | null} distanceInMeters - The distance value in meters.
+ * @returns {string} A formatted distance string in miles (e.g., "1.2 mi") or 'N/A' if input is invalid.
+ */
+export const convertMetersToMiles = (distanceInMeters) => {
+  // --- Input Validation ---
+  if (typeof distanceInMeters !== 'number' || isNaN(distanceInMeters)) {
+    return 'N/A'; // Return 'Not Available' for invalid input
+  }
+  if (distanceInMeters < 0) {
+    return '0 mi'; // Handle negative distances as 0
+  }
+
+  // --- Conversion Logic ---
+  const distanceInMiles = distanceInMeters / 1609.344; // Convert meters to miles
+
+  // --- Formatting Logic ---
+  if (distanceInMiles < 0.1) {
+    // For very short distances (less than 0.1 miles), use feet
+    const distanceInFeet = distanceInMiles * 5280;
+    return `${Math.round(distanceInFeet)} ft`;
+  } else if (distanceInMiles < 10) {
+    // For distances less than 10 miles, show one decimal place
+    return `${distanceInMiles.toFixed(1)} mi`;
+  } else {
+    // For longer distances, round to whole miles
+    return `${Math.round(distanceInMiles)} mi`;
+  }
+};
+
+/**
  * Formats distance in meters to a human-readable string (e.g., "1.2 km", "500 m").
  * 
  * @param {number | undefined | null} distanceInMeters - The distance value in meters.

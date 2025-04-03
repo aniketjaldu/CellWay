@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
-import { convertMetersToMiles, formatDuration } from '../../utils/formatting'; // Utility functions for formatting route data
+import { convertMetersToMiles, formatDuration, getDirectionIcon } from '../../utils/formatting'; // Utility functions for formatting route data
 
 import './DirectionsPanel.css';
-import { getDirectionIcon } from '../../utils/formatting';
 import { closeIconUrl } from '../../assets/icons/index.js';
 
 
