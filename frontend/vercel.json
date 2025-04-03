@@ -6,7 +6,6 @@
     { "src": "/(.*)", "dest": "/index.html" }
   ],
   "env": {
-    "VITE_MAPTILER_KEY": "HJwiHCOYExf37ECEomwa",
-    "VITE_API_BASE_URL": "https://cellway-production.up.railway.app/api"
+    "VITE_API_BASE_URL": "https://ee29-108-7-61-127.ngrok-free.app/api"
   }
 }
