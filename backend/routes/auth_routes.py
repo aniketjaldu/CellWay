@@ -176,7 +176,7 @@ def forgot_password():
 
     Receives email in JSON format. Generates a reset token via user model,
     and sends a password reset email to the user if the email exists.
-    Returns a generic success message for security reasons, regardless of email existence.
+    Returns an error message if the email doesn't exist.
     """
     data = request.json
     email = data.get("email")
@@ -189,7 +189,8 @@ def forgot_password():
 
     if error and not token:
         log.warning(f"Password reset initiation failed internally for email '{email}': {error}")
-        # Still proceed to return generic success to client
+        # Return error message for non-existent email
+        return jsonify({"error": error}), 404  # 404 Not Found for non-existent email
 
     if token:
         log.info(f"Password reset initiated for email: {email}")
@@ -239,8 +240,8 @@ def forgot_password():
             # Consider more robust error reporting (e.g., Sentry)
 
     return jsonify(
-        {"success": True, "message": "If an account exists for this email, a password reset link has been sent."}
-    )  # Generic success for security
+        {"success": True, "message": "Password reset email sent. Please check your inbox."}
+    )  # Success message for valid email
 
 
 @auth_bp.route("/auth/reset-password", methods=["POST"])

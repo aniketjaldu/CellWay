@@ -176,9 +176,7 @@ def forgot_password(email: str) -> tuple[str | None, str | None]:
             - (reset_token, None) if email exists and token is generated (simulating email sent).
               The reset_token is returned for use in constructing the reset link/email.
             - (None, error_message) if email not found or an error occurs.
-              Note: For security, a generic success response should be returned to the client regardless
-              of whether the email exists to prevent email enumeration. However, internally, we log
-              if the email was not found for monitoring purposes.
+              For non-existent emails, returns a specific error rather than a generic message.
     """
     if not email:
         return None, "Email is required."
@@ -186,7 +184,7 @@ def forgot_password(email: str) -> tuple[str | None, str | None]:
         user = users_collection.find_one({"email": email})
         if not user:
             log.warning(f"Password reset requested for non-existent email '{email}'.")
-            return None, "Password reset initiated if email exists."  # Generic message for security
+            return None, "No account found with this email address. Please check your email or register for a new account."
 
         # Generate secure reset token and expiry time
         reset_token = secrets.token_urlsafe(32)  # 32 bytes for good security

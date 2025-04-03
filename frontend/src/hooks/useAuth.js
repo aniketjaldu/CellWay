@@ -141,20 +141,19 @@ export const useAuth = () => {
   const forgotPassword = useCallback(async (email) => {
     try {
       const response = await api.forgotPasswordRequest(email); // Call API to request reset token
-      // Backend should always return success: true for security (prevents email enumeration)
+      
       if (response.data?.success && response.data?.message) {
-        toast.success(response.data.message); // Show the generic success message from the backend
+        toast.success(response.data.message); // Show the success message from the backend
         return { success: true, message: response.data.message };
       }
-      // This part might not be reached if backend always returns success
+      
       return { success: false, error: 'Failed to send password reset email.' };
     } catch (error) {
       const errorMsg = error.response?.data?.error || 'Failed to send password reset email.';
-      // API interceptor might handle showing the toast
-      // toast.error(errorMsg);
+      toast.error(errorMsg); // Show error toast for non-existent email or other errors
       return { success: false, error: errorMsg }; // Return failure and error message
     }
-  }, []); // useCallback ensures function identity is stable
+  }, []);
 
 
   // --- Reset Password Function ---
