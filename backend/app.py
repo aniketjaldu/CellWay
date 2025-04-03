@@ -76,8 +76,9 @@ def create_app(config_class=Config) -> Flask:
     log.info("Flask-Mail extension initialized.")
 
     # --- Configure CORS (Cross-Origin Resource Sharing) ---
-    frontend_origins = ["http://localhost:5173", "http://127.0.0.1:5173", 
-                        "https://cellway.tech", "https://www.cellway.tech"]
+    frontend_origins = ["http://localhost:5173", "http://127.0.0.1:5173",
+                        "https://cellway.tech", "https://www.cellway.tech",
+                        "https://e8a1-108-7-61-127.ngrok-free.app"]
     
     CORS(
         app,
