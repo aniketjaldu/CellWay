@@ -8,7 +8,6 @@ configures logging, and defines a basic health check endpoint.
 import logging
 import os
 import secrets
-import pandas as pd
 
 from flask import Flask, jsonify
 from flask_cors import CORS
@@ -27,25 +26,6 @@ log = logging.getLogger(__name__)  # Logger for this module
 # --- Flask-Mail Initialization ---
 mail = Mail()  # Initialize Flask-Mail extension
 
-# Global variable at module level
-_CELL_TOWERS_DF = None
-
-def get_cell_towers(min_latitude, min_longitude, max_latitude, max_longitude):
-    global _CELL_TOWERS_DF
-    
-    # Load CSV only once and cache it
-    if _CELL_TOWERS_DF is None:
-        _CELL_TOWERS_DF = pd.read_csv("data/cell_towers.csv")
-        
-    # Filter the cached DataFrame
-    cell_towers_df_filtered = _CELL_TOWERS_DF[
-        (_CELL_TOWERS_DF["lat"] >= min_latitude)
-        & (_CELL_TOWERS_DF["lat"] <= max_latitude)
-        & (_CELL_TOWERS_DF["lon"] >= min_longitude)
-        & (_CELL_TOWERS_DF["lon"] <= max_longitude)
-    ]
-    
-    # Rest of the function...
 
 # --- Flask Application Factory ---
 def create_app(config_class=Config) -> Flask:
@@ -97,8 +77,7 @@ def create_app(config_class=Config) -> Flask:
 
     # --- Configure CORS (Cross-Origin Resource Sharing) ---
     frontend_origins = ["http://localhost:5173", "http://127.0.0.1:5173", 
-                        "https://cellway.tech", "https://www.cellway.tech",
-                        "https://cellway-app-79r2r.ondigitalocean.app"]
+                        "https://cellway.tech", "https://www.cellway.tech"]
     
     CORS(
         app,
@@ -141,5 +120,6 @@ def create_app(config_class=Config) -> Flask:
 if __name__ == "__main__":
     app = create_app()  # Create Flask application instance
     # --- Start Flask Development Server ---
-    log.info("Starting Flask server...")
-    app.run(debug=True, host="0.0.0.0", port=8080)  # Run Flask app in debug mode on all interfaces (for container access)
+    log.info("Starting Flask development server...")
+    app.run(debug=True, host="0.0.0.0", port=5001)  # Run Flask app in debug mode on all interfaces (for container access)
+    # --- NOTE: Use production-ready WSGI server (e.g., gunicorn, waitress) for production deployments. ---
