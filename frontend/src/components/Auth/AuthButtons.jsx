@@ -38,7 +38,15 @@ const AuthButtons = ({ user, onLoginClick, onRegisterClick, onLogoutClick, onMyR
 
   // --- Render Logic ---
   return (
-    <div className="auth-buttons-container">
+    <div className="auth-buttons-container"
+      style={{
+        position: 'absolute',
+        bottom: '10px',
+        left: '10px',
+        zIndex: '1000',
+      }}
+    >
+
       {user ? (
         // --- Logged In State ---
         <>
