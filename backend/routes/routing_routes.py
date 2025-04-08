@@ -95,6 +95,8 @@ def calculate_route():
                 status_code = 503  # Service Unavailable
             elif error_code in ["PointNotFound", "NoRoute"]:  # Input related errors
                 status_code = 400  # Bad Request
+            elif error_code == "DistanceLimitExceeded":  # Distance limit error
+                status_code = 400  # Bad Request
             return jsonify({"error": error_message}), status_code
 
         return jsonify(result)  # Return successful route calculation result

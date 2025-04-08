@@ -5,6 +5,7 @@ optimized routes based on speed, cell coverage, or a balance of both.
 """
 import logging
 import random
+import math
 
 import requests
 
@@ -365,6 +366,26 @@ def _get_optimized_route(start_lat: float, start_lng: float, end_lat: float, end
               'optimization_type', and 'tower_data_source'.
               On failure, returns an error dictionary with 'code' and 'message' indicating the error.
     """
+    # Calculate approximate distance using Haversine formula for a quick check
+    # Convert latitude and longitude from degrees to radians
+    lat1, lng1, lat2, lng2 = map(math.radians, [start_lat, start_lng, end_lat, end_lng])
+    
+    # Haversine formula to calculate the great-circle distance
+    dlat = lat2 - lat1
+    dlng = lng2 - lng1
+    a = math.sin(dlat/2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlng/2)**2
+    c = 2 * math.asin(math.sqrt(a))
+    r = 6371  # Radius of Earth in kilometers
+    distance_km = r * c
+    
+    # Check if the distance exceeds the 1000km limit of GraphHopper API free tier
+    if distance_km > 1000:
+        log.warning(f"Route distance exceeds GraphHopper API free tier limit: {distance_km:.1f}km > 1000km")
+        return {
+            "code": "DistanceLimitExceeded", 
+            "message": "Route exceeds the 1000km maximum waypoint distance limit of the GraphHopper API free tier."
+        }
+    
     # 1. Fetch route alternatives from GraphHopper API
     route_alternatives_response = _calculate_graphhopper_routes(start_lat, start_lng, end_lat, end_lng)
 
