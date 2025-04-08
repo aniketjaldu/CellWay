@@ -396,6 +396,10 @@ export const useRouting = (map, user, mapUtils) => {
         clearRoutingState();
         setOriginValue(''); // Reset origin input field
         setDestinationValue(''); // Reset destination input field
+        setShowDirectionsPanel(false); // Hide directions panel
+        updateMarker?.(null, true); // Remove origin marker
+        updateMarker?.(null, false); // Remove destination marker
+        setAllRoutesComputed(false); // Prevent route modifiers panel from showing
         setRoutesAreLoading(false);
         return;
       }
@@ -445,6 +449,10 @@ export const useRouting = (map, user, mapUtils) => {
         clearRoutingState();
         setOriginValue(''); // Reset origin input field
         setDestinationValue(''); // Reset destination input field
+        setShowDirectionsPanel(false); // Hide directions panel
+        updateMarker?.(null, true); // Remove origin marker
+        updateMarker?.(null, false); // Remove destination marker
+        setAllRoutesComputed(false); // Prevent route modifiers panel from showing
         setRoutesAreLoading(false);
         return;
       }
@@ -509,7 +517,7 @@ export const useRouting = (map, user, mapUtils) => {
         calculationAbortController.current = null; // Clear abort controller ref
       }
     }
-  }, [routesAreLoading, routeType, clearRouteLine, displayRoute, clearRoutingState, setOriginValue, setDestinationValue]); // Dependencies
+  }, [routesAreLoading, routeType, clearRouteLine, displayRoute, clearRoutingState, setOriginValue, setDestinationValue, updateMarker]); // Dependencies
 
 
   // --- Set Active Direction Step ---
