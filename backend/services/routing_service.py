@@ -378,12 +378,12 @@ def _get_optimized_route(start_lat: float, start_lng: float, end_lat: float, end
     r = 6371  # Radius of Earth in kilometers
     distance_km = r * c
     
-    # Check if the distance exceeds the 1000km limit of GraphHopper API free tier
-    if distance_km > 1000:
-        log.warning(f"Route distance exceeds GraphHopper API free tier limit: {distance_km:.1f}km > 1000km")
+    # Check if the distance exceeds the 900km limit of GraphHopper API free tier
+    if distance_km > 900:
+        log.warning(f"Route distance exceeds GraphHopper API free tier limit: {distance_km:.1f}km > 900km")
         return {
             "code": "DistanceLimitExceeded", 
-            "message": "Route exceeds the 1000km maximum waypoint distance limit of the GraphHopper API free tier."
+            "message": "Route exceeds the maximum waypoint distance limit of the GraphHopper API free tier."
         }
     
     # 1. Fetch route alternatives from GraphHopper API

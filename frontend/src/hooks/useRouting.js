@@ -5,7 +5,7 @@ import L from 'leaflet';
 
 import * as api from '../services/api.js'; // API service functions
 import { formatDistance, formatDuration, getRouteTypeIcon, formatDate } from '../utils/formatting.js'; // Formatting utilities
-import { calculateSignalScore } from '../utils/geometry.js'; // Geometry utilities (e.g., signal score)
+import { calculateSignalScore, calculateHaversineDistance } from '../utils/geometry.js'; // Geometry utilities (e.g., signal score)
 
 
 // --- JSDoc Type Definitions ---
@@ -379,6 +379,25 @@ export const useRouting = (map, user, mapUtils) => {
 
     // --- Perform API Calls Concurrently ---
     try {
+      // First, approximate the direct distance to check if it's likely over the limit
+      // This is a quick check to save API calls for obviously long routes
+      const directDistance = calculateHaversineDistance(
+        start.lat, start.lng, 
+        end.lat, end.lng
+      );
+      
+      // If the direct distance is over 800km (giving some margin below our 900km limit),
+      // it's almost certainly going to exceed our limit with actual road routing
+      if (directDistance > 800) {
+        toast.error(
+          "Route distance exceeds the 900km maximum limit of the GraphHopper API free tier.", 
+          { id: 'distance-limit-exceeded' }
+        );
+        clearRoutingState();
+        setRoutesAreLoading(false);
+        return;
+      }
+
       const results = await Promise.all( // Fetch all route types in parallel
         typesToCalculate.map(type =>
           api.fetchRoute(start.lat, start.lng, end.lat, end.lng, type, signal) // Pass signal to API call
@@ -397,13 +416,35 @@ export const useRouting = (map, user, mapUtils) => {
                 console.log(`Calculation for '${type}' route aborted.`);
                 return { type, error: 'Aborted' }; // Indicate abortion
               }
-              console.error(`Failed to calculate '${type}' route:`, error.message || error);
-              toast.error(`Failed to calculate ${type} route. ${error.message || ''}`, { id: `calc-err-${type}` });
-              return { type, error: error.message || 'Calculation failed' }; // Return error info
+              
+              // Extract error message from response if available
+              const errorMessage = error.response?.data?.error || error.message || 'Calculation failed';
+              
+              // Check if this is our distance limit error
+              if (errorMessage.includes('exceeds the 900km maximum')) {
+                // Instead of showing individual toasts, we'll show one consolidated toast outside the loop
+                console.error(`Route distance limit exceeded for '${type}' route`);
+                return { type, error: 'DistanceLimitExceeded' };
+              }
+              
+              console.error(`Failed to calculate '${type}' route:`, errorMessage);
+              toast.error(`Failed to calculate ${type} route. ${errorMessage}`, { id: `calc-err-${type}` });
+              return { type, error: errorMessage }; // Return error info
             })
         )
       );
 
+      // Check if all routes failed with distance limit exceeded
+      if (results.every(result => result.error === 'DistanceLimitExceeded')) {
+        toast.error(
+          "Route distance exceeds the 900km maximum limit of the GraphHopper API free tier.", 
+          { id: 'distance-limit-exceeded' }
+        );
+        clearRoutingState();
+        setRoutesAreLoading(false);
+        return;
+      }
+      
       // If the overall calculation was aborted, stop processing
       if (signal.aborted) {
         console.log("Route calculation process aborted.");
