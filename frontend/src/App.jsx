@@ -80,11 +80,20 @@ function App() {
   const mapHookUtils = useMap(mapContainerRef); // Pass ref to hook
   const { map, mapIsReady, updateMarker, displayRouteLine, clearRouteLine, displayLayerGroup, clearLayerGroup, flyTo, fitBounds } = mapHookUtils;
 
+  // Function to clear all search suggestions
+  const clearSuggestions = useCallback(() => {
+    setOriginSuggestions([]);
+    setDestinationSuggestions([]);
+    setShowOriginSuggestions(false);
+    setShowDestinationSuggestions(false);
+  }, []);
+
   // Routing Hook (depends on map, user, mapUtils)
   const routingHookUtils = useRouting(map, user, { // Pass map instance, user, and map utilities
     displayRouteLine, clearRouteLine, fitBounds, updateMarker, clearLayerGroup,
     setOriginValue, // Pass setters to allow routing hook to update search inputs (e.g., on load saved route)
     setDestinationValue,
+    clearSuggestions, // Pass the function to clear suggestions
   });
   const {
     routeType, setRouteType, currentRoutePoints, setCurrentRoutePoints, routeInfo,

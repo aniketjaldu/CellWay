@@ -198,7 +198,8 @@ export const useRouting = (map, user, mapUtils) => {
     updateMarker = () => null,
     clearLayerGroup = () => { },
     setOriginValue = () => { }, // Function to update origin search input value
-    setDestinationValue = () => { } // Function to update destination search input value
+    setDestinationValue = () => { }, // Function to update destination search input value
+    clearSuggestions = () => { }, // Function to clear search suggestions
   } = mapUtils || {};
 
 
@@ -393,13 +394,23 @@ export const useRouting = (map, user, mapUtils) => {
           "Route distance exceeds the 900km maximum limit of the GraphHopper API free tier.", 
           { id: 'distance-limit-exceeded' }
         );
+
+        // Complete UI reset
         clearRoutingState();
+        
+        // Reset input fields and clear suggestions
         setOriginValue(''); // Reset origin input field
         setDestinationValue(''); // Reset destination input field
-        setShowDirectionsPanel(false); // Hide directions panel
+        clearSuggestions(); // Clear all search suggestions
+        
+        // Remove waypoints from the map
         updateMarker?.(null, true); // Remove origin marker
         updateMarker?.(null, false); // Remove destination marker
-        setAllRoutesComputed(false); // Prevent route modifiers panel from showing
+        
+        // Explicitly update routing state to prevent panel from showing
+        setCurrentRoutePointsState({ start: null, end: null }); // Clear route points to prevent panel from opening
+        setAllRoutesComputed(false); // Prevent route modifiers panel from opening
+        
         setRoutesAreLoading(false);
         return;
       }
@@ -446,13 +457,23 @@ export const useRouting = (map, user, mapUtils) => {
           "Route distance exceeds the 900km maximum limit of the GraphHopper API free tier.", 
           { id: 'distance-limit-exceeded' }
         );
+
+        // Complete UI reset
         clearRoutingState();
+        
+        // Reset input fields and clear suggestions
         setOriginValue(''); // Reset origin input field
         setDestinationValue(''); // Reset destination input field
-        setShowDirectionsPanel(false); // Hide directions panel
+        clearSuggestions(); // Clear all search suggestions
+        
+        // Remove waypoints from the map
         updateMarker?.(null, true); // Remove origin marker
         updateMarker?.(null, false); // Remove destination marker
-        setAllRoutesComputed(false); // Prevent route modifiers panel from showing
+        
+        // Explicitly update routing state to prevent panel from showing
+        setCurrentRoutePointsState({ start: null, end: null }); // Clear route points to prevent panel from opening
+        setAllRoutesComputed(false); // Prevent route modifiers panel from opening
+        
         setRoutesAreLoading(false);
         return;
       }
@@ -517,7 +538,7 @@ export const useRouting = (map, user, mapUtils) => {
         calculationAbortController.current = null; // Clear abort controller ref
       }
     }
-  }, [routesAreLoading, routeType, clearRouteLine, displayRoute, clearRoutingState, setOriginValue, setDestinationValue, updateMarker]); // Dependencies
+  }, [routesAreLoading, routeType, clearRouteLine, displayRoute, clearRoutingState, setOriginValue, setDestinationValue, updateMarker, clearSuggestions]); // Dependencies
 
 
   // --- Set Active Direction Step ---
