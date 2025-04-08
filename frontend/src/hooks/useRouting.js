@@ -394,6 +394,8 @@ export const useRouting = (map, user, mapUtils) => {
           { id: 'distance-limit-exceeded' }
         );
         clearRoutingState();
+        setOriginValue(''); // Reset origin input field
+        setDestinationValue(''); // Reset destination input field
         setRoutesAreLoading(false);
         return;
       }
@@ -441,6 +443,8 @@ export const useRouting = (map, user, mapUtils) => {
           { id: 'distance-limit-exceeded' }
         );
         clearRoutingState();
+        setOriginValue(''); // Reset origin input field
+        setDestinationValue(''); // Reset destination input field
         setRoutesAreLoading(false);
         return;
       }
@@ -505,7 +509,7 @@ export const useRouting = (map, user, mapUtils) => {
         calculationAbortController.current = null; // Clear abort controller ref
       }
     }
-  }, [routesAreLoading, routeType, clearRouteLine, displayRoute, clearRoutingState]); // Dependencies
+  }, [routesAreLoading, routeType, clearRouteLine, displayRoute, clearRoutingState, setOriginValue, setDestinationValue]); // Dependencies
 
 
   // --- Set Active Direction Step ---
